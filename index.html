@@ -1,0 +1,1725 @@
+﻿<!DOCTYPE html>
+<html lang="pl" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA / NATIVE APP META TAGS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#022c22" media="(prefers-color-scheme: dark)">
+    <!-- Domyślna ikonka na ekran główny telefonu -->
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=SM&background=22c55e&color=fff&size=512">
+
+
+    <title>Sport Matcher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        if (window.tailwind) {
+            window.tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            darkbg: '#022c22',
+                            darkcard: '#064e3b', 
+                            primary: '#22c55e',
+                            primaryHover: '#16a34a',
+                            accent: '#f97316'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; min-height: 100vh; overflow-x: hidden; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .safe-top { padding-top: var(--sat); }
+        .safe-bottom { padding-bottom: var(--sab); }
+        
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        @keyframes burnLogo {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px rgba(249,115,22,0.4)); }
+            50% { transform: scale(1.08); filter: drop-shadow(0 0 20px rgba(249,115,22,0.8)); }
+        }
+        .animate-burn-logo { animation: burnLogo 1.5s infinite ease-in-out; }
+
+
+        .screen-exit-active { animation: screenExit 0.4s ease-in forwards; pointer-events: none; }
+        .screen-enter-active { animation: screenEnter 0.4s ease-out forwards; }
+        @keyframes screenExit { 100% { opacity: 0; transform: scale(1.1); } }
+        @keyframes screenEnter { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+
+
+        .card-stack { position: relative; width: 100%; max-width: 360px; height: 480px; margin: 0 auto; }
+        .profile-card { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); overflow: hidden; transition: transform 0.3s ease, opacity 0.3s ease; }
+        .swiped-right { transform: translateX(100%) rotate(15deg); opacity: 0; }
+        .swiped-left { transform: translateX(-100%) rotate(-15deg); opacity: 0; }
+        
+        .chat-scroll::-webkit-scrollbar { width: 4px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+
+        .mobile-simulator {
+            max-width: 400px; margin: 0 auto; height: 100vh; position: relative; overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        @media (min-width: 768px) {
+            .mobile-simulator { height: 850px; margin-top: 2rem; margin-bottom: 2rem; border-radius: 2.5rem; border: 8px solid #1f2937; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen transition-colors duration-300">
+
+
+    <script>
+        const SVG_LOGO = `<svg viewBox="0 0 100 100" fill="none" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="flameGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#ef4444"/>
+                    <stop offset="50%" stop-color="#f97316"/>
+                    <stop offset="100%" stop-color="#facc15"/>
+                </linearGradient>
+            </defs>
+            <!-- Ogień z 3 kolcami -->
+            <path d="M50 85 C 10 85, 10 45, 30 35 C 35 45, 40 45, 45 25 C 47 15, 50 5, 50 5 C 50 5, 53 15, 55 25 C 60 45, 65 45, 70 35 C 90 45, 90 85, 50 85 Z" fill="url(#flameGrad)"/>
+            
+            <!-- Piłka Nożna -->
+            <circle cx="50" cy="65" r="18" fill="#ffffff"/>
+            <polygon points="50,55 44,59 46,67 54,67 56,59" fill="#1f2937"/>
+            <line x1="50" y1="55" x2="50" y2="47" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="44" y1="59" x2="35" y2="57" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="46" y1="67" x2="41" y2="76" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="54" y1="67" x2="59" y2="76" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="56" y1="59" x2="65" y2="57" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="50" cy="65" r="18" stroke="#1f2937" stroke-width="3" fill="none"/>
+        </svg>`;
+    </script>
+
+
+    <div class="mobile-simulator w-full flex flex-col bg-white dark:bg-darkbg transition-colors duration-300">
+
+
+        <!-- 1. SPLASH SCREEN -->
+        <div id="splashScreen" class="absolute inset-0 z-[10000] bg-white dark:bg-darkbg flex flex-col items-center justify-center transition-opacity duration-300">
+            <div class="w-32 h-32 mb-4 drop-shadow-2xl" id="splashLogoContainer"></div>
+            <h1 class="text-3xl font-black tracking-widest text-slate-900 dark:text-white drop-shadow-md">SPORT<span class="text-primary">MATCHER</span></h1>
+        </div>
+
+
+        <!-- 2. EKRAN ŁADOWANIA -->
+        <div id="loadingScreen" class="absolute inset-0 z-[9999] bg-white dark:bg-darkbg flex flex-col items-center justify-center hidden">
+            <div class="w-32 h-32 animate-burn-logo" id="loadingLogoContainer"></div>
+        </div>
+
+
+        <!-- 3. EKRAN LOGOWANIA / REJESTRACJI -->
+        <div id="loginScreen" class="absolute inset-0 z-[9000] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden overflow-hidden transition-colors duration-300">
+            <div class="absolute top-6 right-6 z-50">
+                <select id="loginLangSelect" class="text-sm border-none bg-transparent text-gray-500 font-bold focus:ring-0 cursor-pointer outline-none" onchange="changeLang(this.value)">
+                    <option value="pl">🇵🇱 PL</option>
+                    <option value="en">🇬🇧 EN</option>
+                </select>
+            </div>
+            
+            <div class="flex flex-col items-center mt-4 mb-8">
+                <div class="w-20 h-20 mb-3 drop-shadow-md" id="loginLogoContainer"></div>
+                <h1 class="text-3xl font-black tracking-widest text-slate-900 dark:text-white mb-1">SPORT<span class="text-primary">MATCHER</span></h1>
+            </div>
+
+
+            <div class="relative flex-1 w-full overflow-hidden">
+                <div id="authSlider" class="absolute flex w-[200%] h-full transition-transform duration-300 ease-in-out left-0">
+                    
+                    <!-- PANEL LOGOWANIA -->
+                    <div class="w-1/2 px-2 flex flex-col">
+                        <p class="text-gray-500 dark:text-gray-400 font-medium mb-6 text-center" data-i18n="loginSub">Zaloguj się, aby zagrać.</p>
+                        
+                        <div class="w-full space-y-3 mb-6">
+                            <button onclick="proceedToApp()" class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                                <i class="fab fa-apple text-xl mr-3 mb-1"></i><span class="font-semibold text-sm" data-i18n="logApple">Kontynuuj przez Apple</span>
+                            </button>
+                            <button onclick="proceedToApp()" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                                <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                                <span class="font-semibold text-sm" data-i18n="logGoogle">Kontynuuj przez Google</span>
+                            </button>
+                            <button onclick="proceedToApp()" class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                                <i class="fab fa-facebook-f text-lg mr-3"></i><span class="font-semibold text-sm" data-i18n="logFB">Kontynuuj przez Facebook</span>
+                            </button>
+                        </div>
+
+
+                        <div class="relative py-2 flex items-center mb-4">
+                            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+                            <span class="flex-shrink-0 mx-4 text-gray-400 text-xs font-medium uppercase" data-i18n="orLog">LUB</span>
+                            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+                        </div>
+
+
+                        <div class="space-y-3 mb-4">
+                            <div class="relative">
+                                <i class="fas fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="loginEmailInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phEmailLogin" placeholder="Adres e-mail lub login">
+                            </div>
+                            <div class="relative">
+                                <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="password" id="loginPassInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPass" placeholder="Hasło">
+                            </div>
+                            <p id="loginError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
+                            
+                            <button onclick="simulateLogin('email')" class="w-full h-12 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center mt-2">
+                                <span data-i18n="logBtn">Zaloguj się</span>
+                            </button>
+                        </div>
+                        
+                        <div class="text-center mt-auto pb-4">
+                            <span class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="noAccount">Nie masz konta?</span>
+                            <button onclick="toggleAuthPanel('register')" class="ml-1 font-bold text-primary active:text-primaryHover text-sm" data-i18n="registerBtn">Zarejestruj się</button>
+                        </div>
+                    </div>
+
+
+                    <!-- PANEL REJESTRACJI -->
+                    <div class="w-1/2 px-2 flex flex-col">
+                        <p class="text-gray-500 dark:text-gray-400 font-medium mb-6 text-center" data-i18n="regSub">Stwórz konto i zacznij grać.</p>
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="relative">
+                                <i class="fas fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="regLoginInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phLogin" placeholder="Twój login">
+                            </div>
+                            <div class="relative">
+                                <i class="fas fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="email" id="regEmailInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phEmail" placeholder="Adres e-mail">
+                            </div>
+                            <div class="relative">
+                                <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="password" id="regPassInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPass" placeholder="Hasło">
+                            </div>
+                            <p id="regError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
+                        </div>
+
+
+                        <button onclick="simulateLogin('create')" class="w-full h-12 bg-primary text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center">
+                            <span data-i18n="createBtn">Stwórz konto</span>
+                        </button>
+                        
+                        <div class="text-center mt-auto pb-4">
+                            <span class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="hasAccount">Masz już konto?</span>
+                            <button onclick="toggleAuthPanel('login')" class="ml-1 font-bold text-primary active:text-primaryHover text-sm" data-i18n="loginBackBtn">Zaloguj się</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- 3.1 EKRAN POTWIERDZENIA E-MAIL (PO REJESTRACJI) -->
+        <div id="emailConfirmModal" class="absolute inset-0 z-[9500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden items-center justify-center text-center transition-colors duration-300">
+            <div class="w-24 h-24 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mb-6">
+                <i class="fas fa-envelope-open-text text-5xl"></i>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
+            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą!</p>
+            <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
+                Zrozumiałem
+            </button>
+        </div>
+
+
+        <!-- 3.5 EKRAN ONBOARDINGU (Wiek 18+ i Miasto) -->
+        <div id="onboardingScreen" class="absolute inset-0 z-[8500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden overflow-hidden transition-colors duration-300">
+            <div class="flex flex-col items-center mt-4 mb-8">
+                <div class="w-20 h-20 mb-3 drop-shadow-md" id="onboardingLogoContainer"></div>
+                <h1 class="text-3xl font-black tracking-widest text-slate-900 dark:text-white mb-1">SPORT<span class="text-primary">MATCHER</span></h1>
+            </div>
+            
+            <div class="flex-1 w-full flex flex-col justify-center">
+                <p class="text-gray-500 dark:text-gray-400 font-medium mb-6 text-center" data-i18n="onbSub">Wypełnij podstawowe dane, abyśmy mogli znaleźć Ci partnerów.</p>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="relative">
+                        <i class="fas fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="onbName" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phName" placeholder="Twoje Imię">
+                    </div>
+                    <div class="relative">
+                        <i class="fas fa-calendar absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="number" id="onbAge" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phAge" placeholder="Twój Wiek (Min. 18 lat)">
+                    </div>
+                    <div class="relative">
+                        <i class="fas fa-map-marker-alt absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="onbCity" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phCity" placeholder="Wpisz swoje miasto...">
+                    </div>
+                    <div class="relative">
+                        <i class="fas fa-heart absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="onbSport" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="onbSportOpt" placeholder="Ulubiony sport (Opcjonalnie)" oninput="filterOnboardingSports()" onfocus="toggleOnbSportDropdown(true)" autocomplete="off">
+                        <!-- Dropdown dla autouzupełniania -->
+                        <div id="onbSportDropdown" class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-y-auto"></div>
+                    </div>
+                    <p id="onbError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
+                </div>
+
+
+                <button onclick="finishOnboarding()" class="w-full h-12 bg-primary text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center mt-2" data-i18n="onbStart">
+                    Zaczynamy!
+                </button>
+            </div>
+        </div>
+
+
+        <!-- 4. GŁÓWNY KONTENER APLIKACJI -->
+        <div id="appContainer" class="hidden absolute inset-0 bg-white dark:bg-darkbg flex flex-col z-[10] transition-colors duration-300">
+            
+            <header id="mainHeader" class="bg-white dark:bg-darkcard px-6 py-4 flex justify-between items-center shadow-sm z-10 safe-top border-b border-gray-100 dark:border-gray-800">
+                <div class="flex items-center space-x-3">
+                    <div class="w-11 h-11" id="headerLogoContainer"></div>
+                    <h1 class="text-xl font-black text-gray-900 dark:text-white tracking-tight">SPORT<span class="text-primary">MATCHER</span></h1>
+                </div>
+                <button onclick="openSettings()" class="text-gray-500 dark:text-gray-400 hover:text-primary transition p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <i class="fas fa-cog text-xl"></i>
+                </button>
+            </header>
+
+
+            <!-- Ekran Preferencji (Szukaj) -->
+            <main id="preferencesScreen" class="flex-1 overflow-y-auto p-6 hidden flex-col pt-10 bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
+                <div class="text-center mb-8 mt-2 flex flex-col items-center">
+                    <h2 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white" data-i18n="appTitle">Zacznij trening!</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="appSubtitle">Wybierz miasto i sport, aby znaleźć partnerów.</p>
+                </div>
+                
+                <div class="mb-6 bg-white dark:bg-darkcard p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 transition-colors">
+                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2" data-i18n="locationLbl">Lokalizacja</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-map-marker-alt text-primary"></i></div>
+                        <select id="citySelect" class="block w-full pl-10 pr-3 py-3 border-none bg-gray-50 dark:bg-gray-800 rounded-xl focus:ring-2 focus:ring-primary outline-none font-medium text-gray-800 dark:text-white appearance-none cursor-pointer">
+                            <option value="" disabled selected hidden>Wybierz miasto...</option>
+                            <option value="Warszawa">Warszawa</option>
+                            <option value="Kraków">Kraków</option>
+                            <option value="Łódź">Łódź</option>
+                            <option value="Wrocław">Wrocław</option>
+                            <option value="Poznań">Poznań</option>
+                            <option value="Gdańsk">Gdańsk</option>
+                            <option value="Szczecin">Szczecin</option>
+                            <option value="Bydgoszcz">Bydgoszcz</option>
+                            <option value="Lublin">Lublin</option>
+                            <option value="Katowice">Katowice</option>
+                        </select>
+                    </div>
+                    <p id="citySelectError" class="text-red-500 text-xs font-bold mt-2 hidden text-center">Musisz wybrać miasto!</p>
+                </div>
+                
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-3 px-1">
+                        <label class="block text-sm font-bold text-gray-700 dark:text-gray-300" data-i18n="disciplineLbl">Dyscyplina</label>
+                        <button onclick="openSportSearch()" class="text-primary text-sm font-bold active:text-primaryHover"><i class="fas fa-search mr-1"></i> Więcej</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3" id="sportGrid"></div>
+                </div>
+                <button id="startMatchingBtn" class="w-full mt-auto bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_rgba(34,197,94,0.3)] transition transform hover:-translate-y-1 active:scale-95" data-i18n="btnSearch">
+                    Szukaj partnerów
+                </button>
+            </main>
+
+
+            <!-- NOWY EKRAN POSTÓW (Tablica) -->
+            <main id="postsScreen" class="flex-1 overflow-y-auto p-4 hidden flex-col bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
+                <div class="flex flex-wrap justify-between items-center mb-4 px-2 gap-3">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white" data-i18n="navPosts">Posty</h2>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
+                        <!-- Filtr po sporcie -->
+                        <div class="bg-white dark:bg-darkcard px-2 py-1.5 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 shadow-sm flex items-center relative">
+                            <i class="fas fa-search text-primary ml-1 mr-1"></i>
+                            <select id="postSportFilter" class="bg-transparent outline-none appearance-none pr-5 pl-1 font-bold cursor-pointer text-gray-700 dark:text-gray-300 z-10 w-24" onchange="renderPosts()">
+                                <option value="all">Wszystkie</option>
+                                <!-- Pozostałe dynamicznie w JS -->
+                            </select>
+                            <i class="fas fa-chevron-down text-xs text-gray-400 absolute right-2 pointer-events-none"></i>
+                        </div>
+                        <!-- Filtr po mieście -->
+                        <div class="bg-white dark:bg-darkcard px-2 py-1.5 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 shadow-sm flex items-center relative">
+                            <i class="fas fa-map-marker-alt text-primary ml-1 mr-1"></i>
+                            <select id="postCityFilter" class="bg-transparent outline-none appearance-none pr-5 pl-1 font-bold cursor-pointer text-gray-700 dark:text-gray-300 z-10 w-24" onchange="renderPosts()">
+                                <option value="" disabled selected hidden>Wybierz miasto</option>
+                                <option value="Warszawa">Warszawa</option>
+                                <option value="Kraków">Kraków</option>
+                                <option value="Łódź">Łódź</option>
+                                <option value="Wrocław">Wrocław</option>
+                                <option value="Poznań">Poznań</option>
+                                <option value="Gdańsk">Gdańsk</option>
+                                <option value="Szczecin">Szczecin</option>
+                                <option value="Bydgoszcz">Bydgoszcz</option>
+                                <option value="Lublin">Lublin</option>
+                                <option value="Katowice">Katowice</option>
+                            </select>
+                            <i class="fas fa-chevron-down text-xs text-gray-400 absolute right-2 pointer-events-none"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="postsContainer" class="space-y-4">
+                    <!-- Posty generowane dynamicznie -->
+                </div>
+                
+                <!-- Floating Action Button (Dodaj Post) -->
+                <button onclick="openAddPostModal()" class="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition z-40">
+                    <i class="fas fa-plus text-xl"></i>
+                </button>
+            </main>
+
+
+            <!-- Ekran Swipe -->
+            <main id="swipeScreen" class="flex-1 overflow-hidden p-4 hidden flex-col bg-gray-50 dark:bg-darkbg pb-20 transition-colors">
+                <div class="text-center mb-4">
+                    <span id="currentFilterText" class="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-white dark:bg-darkcard shadow-sm border border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300">
+                        <i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>Wrocław • Bieganie</span>
+                    </span>
+                </div>
+                <div class="card-stack flex-1" id="cardStack"></div>
+                <div class="flex justify-center items-center space-x-6 mt-4 mb-2">
+                    <button id="btnNope" class="w-16 h-16 rounded-full bg-white dark:bg-darkcard shadow-[0_5px_15px_rgba(0,0,0,0.08)] text-gray-400 dark:text-gray-500 text-2xl flex justify-center items-center hover:text-red-500 transition transform active:scale-95 border border-gray-100 dark:border-gray-800">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button id="btnLike" class="w-16 h-16 rounded-full bg-white dark:bg-darkcard shadow-[0_5px_15px_rgba(0,0,0,0.08)] text-yellow-500 text-2xl flex justify-center items-center hover:text-yellow-600 transition transform active:scale-95 border border-gray-100 dark:border-gray-800">
+                        <i class="fas fa-bolt"></i>
+                    </button>
+                </div>
+                <div id="noMoreCards" class="hidden absolute inset-0 flex-col items-center justify-center p-6 text-center z-[-1]">
+                    <div class="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4"><i class="fas fa-satellite-dish text-3xl text-gray-400"></i></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2" data-i18n="noProfTitle">Brak profili</h3>
+                    <p class="text-gray-500 dark:text-gray-400 mb-6 text-sm" data-i18n="noProfDesc">Rozszerz kryteria wyszukiwania.</p>
+                    <button onclick="navTo('preferencesScreen')" class="px-6 py-3 bg-white dark:bg-darkcard border border-gray-200 dark:border-gray-700 font-semibold rounded-full shadow-sm text-gray-800 dark:text-gray-200" data-i18n="btnChangeSet">Zmień ustawienia</button>
+                </div>
+            </main>
+
+
+            <!-- Ekran Wiadomości -->
+            <main id="messagesScreen" class="flex-1 overflow-y-auto bg-white dark:bg-darkbg hidden flex-col pb-20 transition-colors">
+                <div class="p-6 pb-2 border-b border-gray-100 dark:border-gray-800">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4" data-i18n="matchNew">Nowe Pary</h2>
+                    <div class="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide" id="matchesList">
+                        <div class="flex flex-col items-center cursor-pointer" onclick="openChat('Trener Bot', 'bot', 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff&size=150')">
+                            <div class="relative">
+                                <div class="w-16 h-16 rounded-full border-2 border-primary p-0.5">
+                                    <img src="https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff&size=150" class="w-full h-full rounded-full object-cover">
+                                </div>
+                                <div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                            </div>
+                            <span class="text-xs font-bold mt-1 dark:text-gray-300">Trener Bot</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 px-2" data-i18n="matchMsg">Wiadomości</h3>
+                    <div class="flex space-x-2 overflow-x-auto px-2 pb-3 mb-2 scrollbar-hide" id="chatFilters">
+                        <button class="chat-filter-btn active px-4 py-1.5 bg-primary text-white rounded-full text-xs font-bold transition" onclick="filterChats('all', this)" data-i18n="chatAll">Wszystkie</button>
+                    </div>
+                    <div id="chatsList">
+                        <div class="chat-item flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl cursor-pointer transition" onclick="openChat('Trener Bot', 'bot', 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff&size=150')" data-sport="bot">
+                            <img src="https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff&size=150" class="w-14 h-14 rounded-full mr-4 object-cover bg-white">
+                            <div class="flex-1">
+                                <div class="flex justify-between items-center mb-1">
+                                    <h4 class="font-bold text-gray-900 dark:text-white">Trener Bot <i class="fas fa-check-circle text-primary text-xs ml-1"></i></h4>
+                                    <span class="text-xs text-gray-400" data-i18n="botNow">Teraz</span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[200px]" id="lastBotMsgPreview" data-i18n="botPreview">Gotowy na dzisiejszy trening?</p>
+                            </div>
+                            <div class="w-3 h-3 bg-primary rounded-full ml-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+
+            <!-- Ekran Chatu -->
+            <main id="chatScreen" class="absolute inset-0 bg-gray-50 dark:bg-darkbg z-20 flex flex-col hidden transform translate-x-full transition-transform duration-300">
+                <div class="bg-white dark:bg-darkcard px-4 py-3 flex items-center shadow-sm border-b border-gray-100 dark:border-gray-800 safe-top">
+                    <button onclick="closeChat()" class="p-2 mr-2 text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fas fa-chevron-left text-xl"></i></button>
+                    <img id="chatHeaderImg" src="" class="w-10 h-10 rounded-full mr-3 object-cover bg-white">
+                    <div>
+                        <h2 class="font-bold text-gray-800 dark:text-white text-sm"><span id="chatHeaderName">Trener Bot</span> <i id="chatHeaderIcon" class="fas fa-robot text-gray-400 ml-1"></i></h2>
+                        <p class="text-xs text-green-500 font-medium" id="chatHeaderStatus" data-i18n="chatAlways">Zawsze aktywny</p>
+                    </div>
+                </div>
+                <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll"></div>
+                <div class="bg-white dark:bg-darkcard p-3 border-t border-gray-100 dark:border-gray-800 safe-bottom">
+                    <div class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-2 relative">
+                        <button onclick="toggleAttachMenu()" class="w-8 h-8 text-gray-500 hover:text-primary transition flex items-center justify-center rounded-full mr-1 shrink-0"><i class="fas fa-plus"></i></button>
+                        <div id="attachMenu" class="hidden absolute bottom-12 left-0 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 shadow-lg rounded-2xl p-2 flex flex-col space-y-1 w-56 z-50">
+                            <label class="flex items-center space-x-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl cursor-pointer text-sm text-gray-700 dark:text-gray-200 font-medium transition">
+                                <div class="w-8 h-8 bg-green-50 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center shrink-0"><i class="fas fa-image"></i></div>
+                                <span data-i18n="chatAttachPhoto">Wyślij zdjęcie</span>
+                                <input type="file" class="hidden" accept="image/*" onchange="sendChatPhoto(event)">
+                            </label>
+                            <button onclick="requestLocationAndOpenVenues()" class="flex items-center space-x-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-left text-sm text-gray-700 dark:text-gray-200 font-medium transition">
+                                <div class="w-8 h-8 bg-orange-50 dark:bg-orange-900/30 text-orange-500 rounded-full flex items-center justify-center shrink-0"><i class="fas fa-map-marker-alt"></i></div>
+                                <span data-i18n="chatSuggestVenue">Zaproponuj miejscówkę</span>
+                            </button>
+                        </div>
+                        <input type="text" id="chatInput" placeholder="Napisz wiadomość..." class="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-800 dark:text-white placeholder-gray-500 p-1 outline-none" onkeypress="handleChatEnter(event)">
+                        <button id="sendMsgBtn" class="ml-2 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primaryHover transition shrink-0" onclick="sendMessage()"><i class="fas fa-paper-plane text-xs -ml-0.5 mt-0.5"></i></button>
+                    </div>
+                </div>
+            </main>
+
+
+            <!-- MODAL DODAWANIA POSTA -->
+            <div id="addPostModal" class="absolute inset-0 bg-white dark:bg-darkbg z-[85] flex flex-col hidden transform translate-y-full transition-transform duration-300 safe-top">
+                <div class="px-6 py-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-darkcard">
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-white" data-i18n="addPostTitle">Nowe ogłoszenie</h2>
+                    <button onclick="closeAddPostModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2"><i class="fas fa-times text-2xl"></i></button>
+                </div>
+                <div class="p-6 flex-1 overflow-y-auto">
+                    <label class="block text-xs font-bold text-gray-400 uppercase">Wybierz miasto</label>
+                    <select id="newPostCity" class="w-full bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl p-3 outline-none focus:border-primary appearance-none mt-1 mb-4">
+                        <option value="Warszawa">Warszawa</option>
+                        <option value="Kraków">Kraków</option>
+                        <option value="Łódź">Łódź</option>
+                        <option value="Wrocław">Wrocław</option>
+                        <option value="Poznań">Poznań</option>
+                        <option value="Gdańsk">Gdańsk</option>
+                        <option value="Szczecin">Szczecin</option>
+                        <option value="Bydgoszcz">Bydgoszcz</option>
+                        <option value="Lublin">Lublin</option>
+                        <option value="Katowice">Katowice</option>
+                    </select>
+
+
+                    <label class="block text-xs font-bold text-gray-400 uppercase">Wybierz sport</label>
+                    <div class="relative mt-1 mb-4">
+                        <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="newPostSportSearch" placeholder="Szukaj sportu..." class="w-full bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-11 pr-3 py-3 outline-none focus:border-primary" onkeyup="filterNewPostSports()" onclick="toggleNewPostSportDropdown(true)">
+                        <input type="hidden" id="newPostSportValue">
+                        <div id="newPostSportDropdown" class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-y-auto"></div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center mt-2 mb-4">
+                        <label class="cursor-pointer text-primary hover:text-primaryHover transition flex items-center gap-2 text-sm font-bold bg-green-50 dark:bg-green-900/30 px-4 py-2 rounded-xl border border-transparent dark:border-green-800">
+                            <i class="fas fa-camera"></i> Dodaj zdjęcie / wideo
+                            <input type="file" id="newPostMediaInput" accept="image/*,video/*" class="hidden" onchange="handlePostMedia(event)">
+                        </label>
+                    </div>
+                    <div id="newPostMediaPreview" class="mb-4 hidden rounded-xl overflow-hidden max-h-40 border border-gray-200 dark:border-gray-700 relative shadow-sm">
+                        <button onclick="clearPostMedia()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center z-10 shadow-md hover:bg-red-600 transition"><i class="fas fa-times text-xs"></i></button>
+                        <img id="newPostImgPreview" class="w-full h-full object-cover hidden">
+                        <video id="newPostVidPreview" class="w-full h-full object-cover hidden" controls></video>
+                    </div>
+
+
+                    <label class="block text-xs font-bold text-gray-400 uppercase">Treść</label>
+                    <textarea id="newPostContent" maxlength="200" oninput="updatePostCounter()" class="w-full h-32 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl p-3 outline-none focus:border-primary resize-none mt-1" placeholder="Kogo szukasz? (np. Brak 1 osoby do piłki na orliku...)"></textarea>
+                    <div class="text-right text-xs text-gray-400 mt-1" id="newPostCounter">0/200 znaków</div>
+                    
+                    <p id="addPostError" class="text-red-500 text-xs font-bold mt-2 hidden text-center">Uzupełnij wszystkie dane!</p>
+                    <button onclick="submitNewPost()" class="w-full mt-4 bg-primary text-white font-bold py-4 rounded-2xl shadow-md active:scale-95 transition" data-i18n="addPostBtn">Opublikuj</button>
+                </div>
+            </div>
+
+
+            <!-- MODAL MIEJSCÓWKI W CZACIE -->
+            <div id="venuesModal" class="absolute inset-0 bg-white dark:bg-darkbg z-[75] flex flex-col hidden transform translate-y-full transition-transform duration-300 safe-top">
+                <div class="px-6 py-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-darkcard">
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-white" data-i18n="venuesTitle">Wybierz miejscówkę</h2>
+                    <button onclick="closeVenuesModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2"><i class="fas fa-times text-2xl"></i></button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div id="gpsPermission" class="flex flex-col items-center justify-center py-12">
+                        <i class="fas fa-map-marked-alt text-5xl text-gray-300 dark:text-gray-700 mb-4"></i>
+                        <h3 class="font-bold text-gray-800 dark:text-white mb-2 text-center">Udostępnij lokalizację</h3>
+                        <p class="text-sm text-gray-500 text-center px-4 mb-6">Musimy sprawdzić, gdzie jesteś, aby wyznaczyć idealny punkt spotkania pośrodku.</p>
+                        <button onclick="openVenuesModal()" class="px-6 py-3 bg-primary text-white font-bold rounded-full shadow-md active:scale-95 transition">Udostępnij GPS</button>
+                    </div>
+
+
+                    <div id="venuesLoading" class="hidden flex-col items-center justify-center py-12">
+                        <i class="fas fa-satellite-dish text-5xl text-primary animate-pulse mb-4"></i>
+                        <h3 class="font-bold text-gray-800 dark:text-white mb-2 text-center">Pobieranie lokalizacji...</h3>
+                        <p class="text-sm text-gray-500 text-center px-4">Szukam optymalnego punktu pomiędzy Tobą a <span id="vLoadMatchName" class="font-bold text-gray-700 dark:text-gray-300">Match</span>...</p>
+                    </div>
+
+
+                    <div id="venuesResults" class="hidden flex-col space-y-4 fade-in">
+                        <div class="flex items-center justify-between bg-white dark:bg-darkcard p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 text-xs font-bold text-gray-500">
+                            <div class="text-center flex flex-col items-center w-1/4">
+                                <div class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-primary flex items-center justify-center mb-1"><i class="fas fa-street-view text-lg"></i></div>
+                                <span class="truncate w-full text-gray-800 dark:text-gray-200">Ty</span>
+                            </div>
+                            <div class="flex-1 px-2 relative h-10 flex items-center">
+                                <div class="h-0.5 bg-gradient-to-r from-green-500 via-orange-500 to-blue-500 w-full rounded-full"></div>
+                                <div class="w-8 h-8 bg-accent rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white shadow-md border-2 border-white dark:border-gray-800 z-10">
+                                    <i class="fas fa-map-pin"></i>
+                                </div>
+                                <span class="absolute -top-3 left-1/2 transform -translate-x-1/2 text-[9px] text-gray-400">POŁOWA DROGI</span>
+                            </div>
+                            <div class="text-center flex flex-col items-center w-1/4">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center mb-1"><i class="fas fa-user text-lg"></i></div>
+                                <span id="vmMatchName" class="truncate w-full text-gray-800 dark:text-white">Match</span>
+                            </div>
+                        </div>
+
+
+                        <div class="w-full h-56 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 relative bg-gray-200">
+                            <iframe id="gmapIframe" width="100%" height="100%" frameborder="0" style="border:0" src="" allowfullscreen></iframe>
+                        </div>
+
+
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1 mt-2">Miejscówki blisko centrum</h3>
+                        <div id="venuesDynamicList" class="space-y-3 pb-6"></div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- EKRAN 5: Profil -->
+            <main id="profileScreen" class="flex-1 overflow-y-auto bg-gray-50 dark:bg-darkbg hidden flex-col pb-20 transition-colors">
+                <div class="bg-gradient-to-b from-green-500 to-green-700 pt-12 pb-6 px-6 text-center relative rounded-b-[2rem] shadow-md">
+                    <div class="relative w-32 h-32 mx-auto mb-4">
+                        <img id="profileImage" src="https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png" alt="Ty" class="w-full h-full rounded-full border-4 border-white object-cover shadow-lg bg-white">
+                        <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="previewImage(event)">
+                        <button class="absolute bottom-0 right-0 bg-white text-primary w-10 h-10 rounded-full border-2 border-green-100 flex items-center justify-center shadow-md transition" onclick="document.getElementById('fileInput').click()"><i class="fas fa-camera"></i></button>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white" data-i18n="profTitle">Twój Profil</h2>
+                    <p class="text-green-100 font-medium text-sm"><span id="accountStatus" data-i18n="profFree">Plan Darmowy</span> <i class="fas fa-fire text-orange-400 ml-1 hidden" id="premiumIcon"></i></p>
+                </div>
+                
+                <div class="p-6 -mt-4 z-10 relative space-y-4">
+                    
+                    <div class="bg-white dark:bg-darkcard rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors flex flex-col justify-between items-start">
+                        <div class="flex justify-between w-full items-center">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1" data-i18n="profPlan">Mój Plan</label>
+                                <div class="font-bold text-lg text-gray-800 dark:text-white flex items-center" id="planName">Darmowy</div>
+                            </div>
+                            <button onclick="togglePlans()" class="text-primary hover:bg-green-50 dark:hover:bg-gray-800 px-3 py-1.5 rounded-lg text-sm font-bold transition flex items-center">Plany <i class="fas fa-chevron-down ml-1 text-xs"></i></button>
+                        </div>
+                        <div id="plansList" class="w-full mt-4 space-y-2 hidden">
+                            <button onclick="upgradeToPlan('Darmowy')" class="w-full flex justify-between items-center p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 hover:border-primary transition group">
+                                <span class="font-bold text-gray-700 dark:text-gray-300">Darmowy</span>
+                                <span class="text-xs text-gray-500">Aktywny</span>
+                            </button>
+                            <!-- Prawdziwy przycisk Stripe -->
+                            <a href="https://buy.stripe.com/test_00geW2d62hKIdZ6bII" target="_blank" onclick="simulateStripeSuccess()" class="w-full flex justify-between items-center p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-darkcard hover:border-orange-500 transition group relative overflow-hidden block">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition"></div>
+                                <span class="font-bold text-gray-800 dark:text-white flex items-center"><i class="fas fa-fire text-orange-400 mr-2"></i> PRO</span>
+                                <span class="text-sm font-bold text-primary flex items-center">19.99 zł/msc <i class="fas fa-external-link-alt ml-2 text-xs"></i></span>
+                            </a>
+                        </div>
+                    </div>
+
+
+                    <div class="bg-white dark:bg-darkcard rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors">
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1" data-i18n="profName">Imię, Wiek i Miasto</label>
+                        <div id="viewNameAge" class="flex justify-between items-center">
+                            <div class="font-bold text-lg text-gray-800 dark:text-white">
+                                <span id="displayName">Kamil</span>, <span id="displayAge">28</span>
+                                <div id="displayCity" class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-0.5"><i class="fas fa-map-marker-alt text-primary mr-1"></i> <span id="displayCityText">Wrocław</span></div>
+                            </div>
+                            <button onclick="toggleEdit('NameAge')" class="text-primary hover:bg-green-50 dark:hover:bg-gray-800 p-2 rounded-full transition"><i class="fas fa-edit"></i></button>
+                        </div>
+                        <div id="editNameAge" class="hidden flex-col gap-2 mt-2">
+                            <div class="flex gap-2">
+                                <input type="text" id="inputName" value="Kamil" class="flex-1 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg p-2 outline-none focus:border-primary text-sm">
+                                <input type="number" id="inputAge" value="28" class="w-20 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg p-2 outline-none focus:border-primary text-sm">
+                            </div>
+                            <input type="text" id="inputProfileCity" placeholder="Twoje miasto" value="Wrocław" class="w-full bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg p-2 outline-none focus:border-primary text-sm mt-1" data-i18n-ph="phCity">
+                            <button onclick="saveEdit('NameAge')" class="self-end px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primaryHover mt-1">Zapisz</button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-darkcard rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors">
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-2" data-i18n="profBio">Moje bio</label>
+                        <div id="viewBio" class="flex justify-between items-start gap-4">
+                            <p id="displayBio" class="text-sm text-gray-600 dark:text-gray-300 break-words italic text-gray-400">Brak opisu.</p>
+                            <button onclick="toggleEdit('Bio')" class="text-primary hover:bg-green-50 dark:hover:bg-gray-800 p-2 rounded-full transition shrink-0"><i class="fas fa-edit"></i></button>
+                        </div>
+                        <div id="editBio" class="hidden flex-col gap-2 mt-2">
+                            <textarea id="inputBio" maxlength="150" oninput="updateBioCounter()" class="w-full text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-darkcard rounded-xl p-3 focus:border-primary outline-none resize-none h-24" placeholder="Napisz coś o sobie..."></textarea>
+                            <div class="flex justify-between items-center mt-1">
+                                <span id="bioCounter" class="text-xs text-gray-400">0/150 znaków</span>
+                                <button onclick="saveEdit('Bio')" class="px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primaryHover">Zapisz</button>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="bg-white dark:bg-darkcard rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors">
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-3" data-i18n="profInt">Zainteresowania Sportowe</label>
+                        <div class="flex flex-wrap gap-2 mb-3" id="profileInterests"></div>
+                        <button id="addInterestBtn" onclick="openInterestModal()" class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition"><i class="fas fa-plus"></i> Dodaj z listy</button>
+                    </div>
+                </div>
+            </main>
+
+
+            <!-- Ustawienia (Nakładka) -->
+            <div id="settingsModal" class="absolute inset-0 bg-white dark:bg-darkbg z-[60] flex flex-col hidden transform translate-y-full transition-transform duration-300 safe-top">
+                <div class="px-6 py-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-darkcard">
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-white" data-i18n="setMain">Ustawienia</h2>
+                    <button onclick="closeSettings()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2"><i class="fas fa-times text-2xl"></i></button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3" data-i18n="setPref">Preferencje</h3>
+                        <div class="bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
+                            <div class="px-4 py-3 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                                <span class="font-medium text-gray-700 dark:text-gray-200" data-i18n="setLang">Język aplikacji</span>
+                                <select id="languageSelect" class="text-sm border-none bg-transparent text-primary font-bold focus:ring-0 cursor-pointer outline-none text-right">
+                                    <option value="pl">🇵🇱 PL</option>
+                                    <option value="en">🇬🇧 EN</option>
+                                </select>
+                            </div>
+                            <div class="px-4 py-3 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                                <span class="font-medium text-gray-700 dark:text-gray-200" data-i18n="setDark">Tryb Ciemny</span>
+                                <div class="w-11 h-6 bg-gray-300 dark:bg-primary rounded-full relative cursor-pointer transition-colors" onclick="toggleDarkMode()">
+                                    <div id="darkToggleDot" class="w-4 h-4 bg-white rounded-full absolute left-1 top-1 transition-transform transform translate-x-0 dark:translate-x-5"></div>
+                                </div>
+                            </div>
+                            <div class="px-4 py-3 flex justify-between items-center">
+                                <span class="font-medium text-gray-700 dark:text-gray-200" data-i18n="setPush">Powiadomienia Push</span>
+                                <div class="w-11 h-6 bg-primary rounded-full relative cursor-pointer">
+                                    <div class="w-4 h-4 bg-white rounded-full absolute right-1 top-1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3" data-i18n="setInfo">Informacje i Pomoc</h3>
+                        <div class="bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
+                            <button onclick="openTextModal('terms')" class="w-full text-left px-4 py-3 border-b border-gray-50 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-200 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <span data-i18n="setTerms">Regulamin</span> <i class="fas fa-chevron-right text-gray-300 text-xs"></i>
+                            </button>
+                            <button onclick="openTextModal('privacy')" class="w-full text-left px-4 py-3 border-b border-gray-50 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-200 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <span data-i18n="setPriv">Polityka Prywatności</span> <i class="fas fa-chevron-right text-gray-300 text-xs"></i>
+                            </button>
+                            <button onclick="openTextModal('help')" class="w-full text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-200 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <span data-i18n="setHelp">Centrum Pomocy</span> <i class="fas fa-chevron-right text-gray-300 text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="performLogout()" class="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold py-4 rounded-xl border border-red-100 dark:border-red-900 transition mt-6 active:scale-95" data-i18n="setLogout">
+                        Wyloguj się
+                    </button>
+                </div>
+            </div>
+
+
+            <!-- BAZA SPORTÓW DO DODANIA ZAINTERESOWAŃ -->
+            <div id="interestModal" class="absolute inset-0 bg-white dark:bg-darkbg z-[65] flex flex-col hidden transform translate-y-full safe-top transition-transform duration-300">
+                <div class="px-6 py-4 flex items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-darkcard justify-between">
+                    <h2 class="text-lg font-bold text-gray-800 dark:text-white">Wybierz sport</h2>
+                    <button onclick="closeInterestModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2"><i class="fas fa-times text-xl"></i></button>
+                </div>
+                <div class="px-4 py-3 bg-gray-50 dark:bg-darkbg border-b border-gray-100 dark:border-gray-800">
+                    <div class="w-full bg-white dark:bg-darkcard rounded-xl flex items-center px-3 border border-gray-200 dark:border-gray-700">
+                        <i class="fas fa-search text-gray-400 text-sm"></i>
+                        <input type="text" id="interestSearchInput" placeholder="Szukaj sportu..." class="w-full p-2 text-sm outline-none bg-transparent dark:text-white" onkeyup="filterInterestModal()">
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 bg-white dark:bg-darkbg">
+                    <div class="flex flex-col gap-2" id="interestModalList"></div>
+                </div>
+            </div>
+
+
+            <!-- MODAL BAZY SPORTÓW DLA GŁÓWNEGO EKRANU -->
+            <div id="sportSearchModal" class="absolute inset-0 bg-white dark:bg-darkbg z-[65] flex flex-col hidden transform translate-x-full safe-top transition-transform duration-300">
+                <div class="px-6 py-4 flex items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-darkcard">
+                    <button onclick="closeSportSearch()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2 mr-2"><i class="fas fa-chevron-left text-xl"></i></button>
+                    <div class="flex-1 bg-white dark:bg-darkcard rounded-xl flex items-center px-3 border border-gray-200 dark:border-gray-700">
+                        <i class="fas fa-search text-gray-400 text-sm"></i>
+                        <input type="text" id="sportSearchInput" placeholder="Szukaj sportu..." class="w-full p-2 text-sm outline-none bg-transparent dark:text-white" onkeyup="filterSports()">
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-darkbg">
+                    <div class="grid grid-cols-2 gap-3" id="allSportsList"></div>
+                </div>
+            </div>
+
+
+            <!-- GENERYCZNY MODAL TEKSTOWY -->
+            <div id="textModal" class="absolute inset-0 bg-white dark:bg-darkbg z-[70] flex flex-col hidden transform translate-y-full transition-transform duration-300 safe-top">
+                <div class="px-6 py-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-darkcard">
+                    <h2 id="textModalTitle" class="text-xl font-bold text-gray-800 dark:text-white">Tytuł</h2>
+                    <button onclick="closeTextModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2"><i class="fas fa-chevron-down text-2xl"></i></button>
+                </div>
+                <div id="textModalContent" class="flex-1 overflow-y-auto p-6 text-gray-700 dark:text-gray-300 text-sm leading-relaxed space-y-4"></div>
+            </div>
+
+
+            <!-- MODAL POTWIERDZENIA E-MAIL -->
+            <div id="emailConfirmModal" class="absolute inset-0 bg-slate-900/80 z-[9500] hidden flex-col items-center justify-center p-6 fade-in">
+                <div class="bg-white dark:bg-darkcard rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+                    <div class="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-envelope-open-text text-4xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm mb-8" data-i18n="emailConfDesc">Wysłaliśmy link aktywacyjny na Twój adres. Kliknij go, aby zweryfikować konto!</p>
+                    <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
+                        Rozumiem
+                    </button>
+                </div>
+            </div>
+
+
+            <!-- MODAL MATCH (Złota Błyskawica) -->
+            <div id="matchModal" class="absolute inset-0 bg-slate-900/95 z-[80] hidden flex-col items-center justify-center p-6 text-white fade-in">
+                <h2 class="text-5xl font-black mb-8 italic text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-500 drop-shadow-lg">MATCH!</h2>
+                <div class="flex items-center space-x-4 mb-8 relative">
+                    <div class="w-24 h-24 rounded-full border-4 border-white bg-gray-300 overflow-hidden z-10"><img id="yourMatchImg" src="https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png" class="w-full h-full object-cover bg-white"></div>
+                    <div class="absolute inset-0 flex items-center justify-center"><div class="w-10 h-10 bg-white rounded-full flex items-center justify-center z-20 shadow-xl"><i class="fas fa-bolt text-yellow-400 text-xl"></i></div></div>
+                    <div class="w-24 h-24 rounded-full border-4 border-primary bg-gray-300 overflow-hidden shadow-[0_0_20px_rgba(34,197,94,0.6)] z-10"><img id="matchImage" src="" class="w-full h-full object-cover bg-white"></div>
+                </div>
+                <p class="text-xl text-center mb-10"><span id="matchName" class="font-bold">Ktoś</span> <span data-i18n="matchReady">jest gotowy na trening!</span></p>
+                <div class="w-full space-y-3 max-w-[300px]">
+                    <button id="goChatBtn" class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-4 rounded-full shadow-lg" data-i18n="matchGoMsg">Przejdź do wiadomości</button>
+                    <button onclick="closeMatchModal()" class="w-full border border-white/30 text-white font-semibold py-4 rounded-full hover:bg-white/10" data-i18n="matchPlay">Graj dalej</button>
+                </div>
+            </div>
+
+
+            <!-- Dolny pasek nawigacji -->
+            <nav id="bottomNav" class="absolute bottom-0 w-full bg-white dark:bg-darkcard border-t border-gray-100 dark:border-gray-800 flex justify-around p-2 z-10 safe-bottom transition-colors">
+                <button class="nav-btn active flex flex-col items-center py-1 px-3 rounded-xl text-primary transition" onclick="navTo('preferencesScreen', this)">
+                    <i class="fas fa-search text-xl mb-1"></i><span class="text-[10px] font-bold" data-i18n="navSearch">Szukaj</span>
+                </button>
+                <button class="nav-btn flex flex-col items-center py-1 px-3 rounded-xl text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition" onclick="navTo('postsScreen', this)">
+                    <i class="fas fa-clipboard-list text-xl mb-1"></i><span class="text-[10px] font-bold" data-i18n="navPosts">Posty</span>
+                </button>
+                <button class="nav-btn flex flex-col items-center py-1 px-3 rounded-xl text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition" onclick="navTo('messagesScreen', this)">
+                    <div class="relative"><i class="fas fa-comment-dots text-xl mb-1"></i><span class="absolute -top-1 -right-2 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-white dark:border-gray-800">1</span></div>
+                    <span class="text-[10px] font-bold" data-i18n="navChats">Czaty</span>
+                </button>
+                <button class="nav-btn flex flex-col items-center py-1 px-3 rounded-xl text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition" onclick="navTo('profileScreen', this)">
+                    <i class="far fa-user text-xl mb-1"></i><span class="text-[10px] font-bold" data-i18n="navProfile">Profil</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+
+    <!-- PONIŻEJ ODBUDOWANY, CZYSTY KOD JAVASCRIPT BEZ DUPLIKATÓW -->
+    <script>
+        // Przywrócenie renderowania loga (bezpieczne, odporne na null)
+        ['splashLogoContainer', 'loadingLogoContainer', 'loginLogoContainer', 'onboardingLogoContainer', 'mainScreenLogoContainer', 'headerLogoContainer'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.innerHTML = SVG_LOGO;
+        });
+
+
+        // 1. ZARZĄDZANIE EKRANEM STARTOWYM
+        function toggleDarkMode() { document.documentElement.classList.toggle('dark'); }
+
+
+        window.addEventListener('load', () => {
+            renderNewPostSports();
+            renderOnboardingSports(); // Inicjalizacja podpowiedzi w Onboardingu
+            
+            const filterSportSel = document.getElementById('postSportFilter');
+            allSports.forEach(s => { 
+                if (filterSportSel) filterSportSel.innerHTML += `<option value="${s.id}">${s.emoji} ${s.name}</option>`; 
+            });
+            
+            renderSportGrid(); renderPosts(); renderProfileInterests();
+            
+            setTimeout(() => {
+                const splash = document.getElementById('splashScreen');
+                if(splash) {
+                    splash.style.opacity = '0';
+                    setTimeout(() => {
+                        splash.remove();
+                        const loginScreen = document.getElementById('loginScreen');
+                        if(loginScreen) {
+                            loginScreen.classList.remove('hidden');
+                            loginScreen.classList.add('fade-in');
+                        }
+                    }, 300);
+                }
+            }, 1500); 
+        });
+
+
+        // 2. LOGOWANIE I AUTORYZACJA
+        function toggleAuthPanel(target) {
+            const slider = document.getElementById('authSlider');
+            slider.style.transform = target === 'register' ? 'translateX(-50%)' : 'translateX(0)';
+            document.getElementById('loginError').classList.add('hidden'); document.getElementById('regError').classList.add('hidden');
+        }
+
+
+        function simulateLogin(provider) {
+            if (provider === 'email') {
+                if(!document.getElementById('loginEmailInput').value.trim() || !document.getElementById('loginPassInput').value.trim()) { 
+                    document.getElementById('loginError').innerText = i18n[currentLang].fillDataErr;
+                    document.getElementById('loginError').classList.remove('hidden'); 
+                    return; 
+                }
+                document.getElementById('loginError').classList.add('hidden');
+            } else if (provider === 'create') {
+                const emailVal = document.getElementById('regEmailInput').value.trim();
+                if(!document.getElementById('regLoginInput').value.trim() || !emailVal || !document.getElementById('regPassInput').value.trim()) { 
+                    document.getElementById('regError').innerText = i18n[currentLang].fillDataErr;
+                    document.getElementById('regError').classList.remove('hidden'); 
+                    return; 
+                }
+                if(!emailVal.includes('@')) {
+                    document.getElementById('regError').innerText = currentLang === 'pl' ? "Podaj poprawny adres e-mail (zawierający @)!" : "Enter a valid email address (with @)!";
+                    document.getElementById('regError').classList.remove('hidden'); 
+                    return;
+                }
+                document.getElementById('regError').classList.add('hidden');
+                
+                const loginScreen = document.getElementById('loginScreen');
+                loginScreen.classList.add('screen-exit-active');
+                setTimeout(() => {
+                    loginScreen.classList.add('hidden'); loginScreen.classList.remove('screen-exit-active');
+                    const confScreen = document.getElementById('emailConfirmModal');
+                    confScreen.classList.remove('hidden'); confScreen.classList.add('screen-enter-active', 'flex');
+                    setTimeout(() => { confScreen.classList.remove('screen-enter-active'); }, 500);
+                }, 400);
+                return; 
+            }
+            proceedToApp();
+        }
+
+
+        function closeEmailConfirmAndContinue() {
+            const confScreen = document.getElementById('emailConfirmModal');
+            confScreen.classList.add('screen-exit-active');
+            setTimeout(() => {
+                confScreen.classList.add('hidden'); confScreen.classList.remove('flex', 'screen-exit-active');
+                proceedToApp();
+            }, 400);
+        }
+
+
+        function proceedToApp() {
+            const loader = document.getElementById('loadingScreen'); loader.classList.remove('hidden');
+            setTimeout(() => {
+                loader.classList.add('hidden');
+                const loginScreen = document.getElementById('loginScreen'); 
+                if(!loginScreen.classList.contains('hidden')) {
+                    loginScreen.classList.add('screen-exit-active');
+                    setTimeout(() => {
+                        loginScreen.classList.add('hidden'); loginScreen.classList.remove('screen-exit-active');
+                        showOnboarding();
+                    }, 400); 
+                } else {
+                    showOnboarding();
+                }
+            }, 1500); 
+        }
+
+
+        function performLogout() {
+            closeSettings(); 
+            const appCont = document.getElementById('appContainer'); appCont.classList.add('screen-exit-active');
+            setTimeout(() => {
+                appCont.classList.add('hidden'); appCont.classList.remove('screen-exit-active');
+                document.getElementById('preferencesScreen').classList.add('hidden'); 
+                document.getElementById('postsScreen').classList.add('hidden'); 
+                document.getElementById('messagesScreen').classList.add('hidden'); 
+                document.getElementById('profileScreen').classList.add('hidden'); 
+                document.getElementById('swipeScreen').classList.add('hidden');
+                
+                const loginScreen = document.getElementById('loginScreen'); 
+                loginScreen.classList.remove('hidden'); loginScreen.classList.add('screen-enter-active');
+                toggleAuthPanel('login'); 
+                
+                document.getElementById('loginEmailInput').value = ''; 
+                document.getElementById('loginPassInput').value = ''; 
+                document.getElementById('regLoginInput').value = ''; 
+                document.getElementById('regEmailInput').value = ''; 
+                document.getElementById('regPassInput').value = '';
+                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
+            }, 400);
+        }
+
+
+        // 3. ONBOARDING
+        function showOnboarding() {
+            const onbScreen = document.getElementById('onboardingScreen'); 
+            onbScreen.classList.remove('hidden'); 
+            onbScreen.classList.add('screen-enter-active');
+            setTimeout(() => { onbScreen.classList.remove('screen-enter-active'); }, 500);
+        }
+
+
+        // --- Logika autouzupełniania dla Onboardingu ---
+        function renderOnboardingSports() {
+            const dropdown = document.getElementById('onbSportDropdown');
+            if(!dropdown) return;
+            dropdown.innerHTML = '';
+            allSports.forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'onb-sport-item px-4 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-sm font-medium text-gray-800 dark:text-white transition border-b border-gray-50 dark:border-gray-700 last:border-0';
+                item.innerHTML = `<span class="mr-3 text-xl w-8 text-center">${s.emoji}</span> ${s.name}`;
+                item.onclick = () => { 
+                    document.getElementById('onbSport').value = s.name; 
+                    toggleOnbSportDropdown(false); 
+                };
+                dropdown.appendChild(item);
+            });
+        }
+        
+        function toggleOnbSportDropdown(show) { 
+            const drop = document.getElementById('onbSportDropdown');
+            if(drop) drop.style.display = show ? 'block' : 'none'; 
+        }
+        
+        function filterOnboardingSports() { 
+            const val = document.getElementById('onbSport').value.toLowerCase(); 
+            const items = document.querySelectorAll('.onb-sport-item');
+            let hasVisible = false;
+            items.forEach(item => { 
+                const match = item.innerText.toLowerCase().includes(val);
+                item.style.display = match ? 'flex' : 'none'; 
+                if(match) hasVisible = true;
+            });
+            toggleOnbSportDropdown(hasVisible && val.length > 0);
+        }
+
+
+        // Zamknięcie dropdowna po kliknięciu poza niego (obsługa ogólna dla onb i postów)
+        document.addEventListener('click', (e) => {
+            const onbDropdown = document.getElementById('onbSportDropdown');
+            const onbInput = document.getElementById('onbSport');
+            if (onbDropdown && !onbDropdown.contains(e.target) && e.target !== onbInput) {
+                toggleOnbSportDropdown(false);
+            }
+        });
+        // --- Koniec autouzupełniania ---
+
+
+        function finishOnboarding() {
+            const name = document.getElementById('onbName').value.trim();
+            const age = document.getElementById('onbAge').value.trim();
+            const city = document.getElementById('onbCity').value.trim();
+            const errEl = document.getElementById('onbError');
+            
+            if(!name || !age || !city) { errEl.innerText = i18n[currentLang].fillDataErr; errEl.classList.remove('hidden'); return; }
+            if(parseInt(age) < 18) { errEl.innerText = currentLang === 'pl' ? "Aplikacja jest od 18 roku życia!" : "App is for 18+ only!"; errEl.classList.remove('hidden'); return; }
+            errEl.classList.add('hidden');
+            
+            document.getElementById('displayName').innerText = name; document.getElementById('inputName').value = name;
+            document.getElementById('displayAge').innerText = age; document.getElementById('inputAge').value = age;
+            document.getElementById('displayCityText').innerText = city; document.getElementById('inputProfileCity').value = city;
+            
+            document.getElementById('postCityFilter').value = city;
+            document.getElementById('newPostCity').value = city;
+
+
+            const selectedOnbSport = document.getElementById('onbSport').value.trim();
+            if(selectedOnbSport) {
+                const matched = allSports.find(s => s.name.toLowerCase() === selectedOnbSport.toLowerCase() || s.id === selectedOnbSport.toLowerCase());
+                if (matched) {
+                    userInterests = [matched.id];
+                } else {
+                    const customId = 'custom_' + Date.now();
+                    allSports.push({id: customId, name: selectedOnbSport, icon: 'fa-star', emoji: '⭐'});
+                    userInterests = [customId];
+                }
+                renderProfileInterests();
+            }
+
+
+            const onbScreen = document.getElementById('onboardingScreen'); onbScreen.classList.add('screen-exit-active');
+            setTimeout(() => {
+                onbScreen.classList.add('hidden'); onbScreen.classList.remove('screen-exit-active');
+                const appCont = document.getElementById('appContainer'); appCont.classList.remove('hidden'); appCont.classList.add('screen-enter-active');
+                document.getElementById('preferencesScreen').classList.remove('hidden');
+                setTimeout(() => { appCont.classList.remove('screen-enter-active'); renderPosts(); }, 500);
+            }, 400);
+        }
+
+
+        // 4. PROFIL
+        function toggleEdit(field) { document.getElementById('view' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('hidden'); document.getElementById('edit' + field).classList.add('flex'); if(field === 'Bio') updateBioCounter(); }
+        function saveEdit(field) {
+            document.getElementById('edit' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('flex'); document.getElementById('view' + field).classList.remove('hidden');
+            if(field === 'NameAge') { 
+                document.getElementById('displayName').innerText = document.getElementById('inputName').value; 
+                document.getElementById('displayAge').innerText = document.getElementById('inputAge').value; 
+                document.getElementById('displayCityText').innerText = document.getElementById('inputProfileCity').value; 
+                document.getElementById('postCityFilter').value = document.getElementById('inputProfileCity').value;
+                document.getElementById('newPostCity').value = document.getElementById('inputProfileCity').value;
+                renderPosts(); 
+            } 
+            else if (field === 'Bio') { 
+                const bioVal = document.getElementById('inputBio').value;
+                const displayEl = document.getElementById('displayBio');
+                if(bioVal.trim() === '') {
+                    displayEl.innerText = currentLang === 'pl' ? "Brak opisu." : "No description added yet.";
+                    displayEl.classList.add('italic', 'text-gray-400');
+                } else {
+                    displayEl.innerText = bioVal;
+                    displayEl.classList.remove('italic', 'text-gray-400');
+                }
+            }
+        }
+        function updateBioCounter() { const bioInput = document.getElementById('inputBio'); const counter = document.getElementById('bioCounter'); counter.innerText = `${bioInput.value.length}/150 znaków`; }
+        function togglePlans() { const list = document.getElementById('plansList'); if(list.classList.contains('hidden')) { list.classList.remove('hidden'); list.classList.add('fade-in'); } else { list.classList.add('hidden'); list.classList.remove('fade-in'); } }
+
+
+        let isPro = false;
+        
+        // Symulacja powrotu ze Stripe'a (w normalnej apce to robi backend przez webhook)
+        function simulateStripeSuccess() {
+            setTimeout(() => {
+                upgradeToPlan('PRO');
+                alert("Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!");
+            }, 2000); // Udaje opóźnienie weryfikacji
+        }
+
+
+        function upgradeToPlan(planType) {
+            isPro = (planType === 'PRO'); document.getElementById('planName').innerText = planType;
+            if(isPro) { document.getElementById('planName').classList.add('text-orange-500'); document.getElementById('accountStatus').innerText = i18n[currentLang].profPrem; document.getElementById('premiumIcon').classList.remove('hidden'); } 
+            else { document.getElementById('planName').classList.remove('text-orange-500'); document.getElementById('accountStatus').innerText = i18n[currentLang].profFree; document.getElementById('premiumIcon').classList.add('hidden'); }
+            togglePlans();
+        }
+
+
+        function previewImage(event) { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { document.getElementById('profileImage').src = e.target.result; document.getElementById('yourMatchImg').src = e.target.result; }; reader.readAsDataURL(event.target.files[0]); } }
+
+
+        // 5. BAZA SPORTÓW
+        const allSports = [
+            { id: 'bieganie', name: 'Bieganie', icon: 'fa-shoe-prints', emoji: '🏃' }, { id: 'tenis', name: 'Tenis', icon: 'fa-table-tennis', emoji: '🎾' },
+            { id: 'silownia', name: 'Siłownia', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'rower', name: 'Rower', icon: 'fa-bicycle', emoji: '🚴' },
+            { id: 'koszykowka', name: 'Koszykówka', icon: 'fa-basketball-ball', emoji: '🏀' }, { id: 'siatkowka', name: 'Siatkówka', icon: 'fa-volleyball-ball', emoji: '🏐' },
+            { id: 'plywanie', name: 'Pływanie', icon: 'fa-swimmer', emoji: '🏊' }, { id: 'squash', name: 'Squash', icon: 'fa-stopwatch', emoji: '🏸' },
+            { id: 'pilkanozna', name: 'Piłka nożna', icon: 'fa-futbol', emoji: '⚽' }, { id: 'joga', name: 'Joga/Pilates', icon: 'fa-om', emoji: '🧘' },
+            { id: 'wspinaczka', name: 'Wspinaczka', icon: 'fa-mountain', emoji: '🧗' }, { id: 'rolki', name: 'Rolki', icon: 'fa-skating', emoji: '🛼' },
+            { id: 'pingpong', name: 'Tenis stołowy', icon: 'fa-table-tennis', emoji: '🏓' }, { id: 'badminton', name: 'Badminton', icon: 'fa-feather', emoji: '🏸' },
+            { id: 'boks', name: 'Sztuki walki', icon: 'fa-user-ninja', emoji: '🥊' }, { id: 'taniec', name: 'Taniec', icon: 'fa-music', emoji: '💃' },
+            { id: 'szachy', name: 'Szachy', icon: 'fa-chess', emoji: '♟️' }, { id: 'narty', name: 'Narciarstwo', icon: 'fa-skiing', emoji: '⛷️' },
+            { id: 'snowboard', name: 'Snowboard', icon: 'fa-snowboarding', emoji: '🏂' }, { id: 'golf', name: 'Golf', icon: 'fa-golf-ball', emoji: '⛳' },
+            { id: 'kalistenika', name: 'Kalistenika', icon: 'fa-child', emoji: '🤸' }, { id: 'crossfit', name: 'CrossFit', icon: 'fa-dumbbell', emoji: '🏋️‍♂️' },
+            { id: 'mma', name: 'MMA', icon: 'fa-fist-raised', emoji: '🤼' }, { id: 'bjj', name: 'BJJ', icon: 'fa-user-ninja', emoji: '🥋' },
+            { id: 'trekking', name: 'Trekking', icon: 'fa-hiking', emoji: '🥾' }, { id: 'nordic', name: 'Nordic Walking', icon: 'fa-walking', emoji: '🦯' },
+            { id: 'rowerszosowy', name: 'Rower szosowy', icon: 'fa-biking', emoji: '🚴‍♂️' }, { id: 'mtb', name: 'Rower MTB', icon: 'fa-mountain', emoji: '🚵' },
+            { id: 'bieginor', name: 'Biegi na orientację', icon: 'fa-map-signs', emoji: '🧭' }, { id: 'triathlon', name: 'Triathlon', icon: 'fa-swimmer', emoji: '🏊‍♂️' },
+            { id: 'kajaki', name: 'Kajakarstwo', icon: 'fa-water', emoji: '🛶' }, { id: 'sup', name: 'SUP', icon: 'fa-water', emoji: '🏄‍♂️' },
+            { id: 'windsurfing', name: 'Windsurfing', icon: 'fa-wind', emoji: '🌬️' }, { id: 'kitesurfing', name: 'Kitesurfing', icon: 'fa-kite', emoji: '🪁' },
+            { id: 'zeglarstwo', name: 'Żeglarstwo', icon: 'fa-ship', emoji: '⛵' }, { id: 'nurkowanie', name: 'Nurkowanie', icon: 'fa-water', emoji: '🤿' },
+            { id: 'lyzwy', name: 'Łyżwiarstwo figurowe', icon: 'fa-ice-skate', emoji: '⛸️' }, { id: 'hokej', name: 'Hokej', icon: 'fa-hockey-puck', emoji: '🏒' },
+            { id: 'curling', name: 'Curling', icon: 'fa-bullseye', emoji: '🥌' }, { id: 'rugby', name: 'Rugby', icon: 'fa-football-ball', emoji: '🏉' },
+            { id: 'futbolamer', name: 'Futbol ameryk.', icon: 'fa-football-ball', emoji: '🏈' }, { id: 'baseball', name: 'Baseball', icon: 'fa-baseball-ball', emoji: '⚾' },
+            { id: 'krykiet', name: 'Krykiet', icon: 'fa-cricket', emoji: '🏏' }, { id: 'bilard', name: 'Bilard/Snooker', icon: 'fa-circle', emoji: '🎱' },
+            { id: 'kregle', name: 'Kręgle', icon: 'fa-bowling-ball', emoji: '🎳' }, { id: 'lotki', name: 'Rzutki (Darts)', icon: 'fa-bullseye', emoji: '🎯' },
+            { id: 'lucznictwo', name: 'Łucznictwo', icon: 'fa-bullseye', emoji: '🏹' }, { id: 'strzelectwo', name: 'Strzelectwo', icon: 'fa-crosshairs', emoji: '🔫' },
+            { id: 'jezdziectwo', name: 'Jeździectwo', icon: 'fa-horse', emoji: '🏇' }, { id: 'szermierka', name: 'Szermierka', icon: 'fa-khanda', emoji: '🤺' },
+            { id: 'gimnastyka', name: 'Gimnastyka', icon: 'fa-child', emoji: '🤸‍♀️' }, { id: 'akrobatyka', name: 'Akrobatyka', icon: 'fa-child', emoji: '🤸‍♂️' },
+            { id: 'zumba', name: 'Zumba', icon: 'fa-users', emoji: '👯' }, { id: 'pole', name: 'Pole Dance', icon: 'fa-user', emoji: '💃' },
+            { id: 'aerial', name: 'Aerial Hoop', icon: 'fa-ring', emoji: '⭕' }, { id: 'padel', name: 'Padel', icon: 'fa-table-tennis', emoji: '🏓' },
+            { id: 'esport', name: 'E-sport', icon: 'fa-gamepad', emoji: '🎮' }, { id: 'wedkarstwo', name: 'Wędkarstwo', icon: 'fa-fish', emoji: '🎣' },
+            { id: 'skokinarciarskie', name: 'Skoki narciarskie', icon: 'fa-skiing', emoji: '⛷️' }, { id: 'hokejnatrawie', name: 'Hokej na trawie', icon: 'fa-hockey-puck', emoji: '🏑' },
+            { id: 'kolarstwotorowe', name: 'Kolarstwo torowe', icon: 'fa-bicycle', emoji: '🚴' }, { id: 'surfing', name: 'Surfing', icon: 'fa-water', emoji: '🏄' },
+            { id: 'karting', name: 'Karting', icon: 'fa-car', emoji: '🏎️' }, { id: 'parkour', name: 'Parkour', icon: 'fa-shoe-prints', emoji: '🏃' },
+            { id: 'alpinizm', name: 'Alpinizm', icon: 'fa-mountain', emoji: '🧗‍♂️' }, { id: 'bouldering', name: 'Bouldering', icon: 'fa-mountain', emoji: '🧗‍♀️' },
+            { id: 'trojboj', name: 'Trójbój siłowy', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'judo', name: 'Judo', icon: 'fa-user-ninja', emoji: '🥋' },
+            { id: 'karate', name: 'Karate', icon: 'fa-user-ninja', emoji: '🥋' }, { id: 'taekwondo', name: 'Taekwondo', icon: 'fa-user-ninja', emoji: '🥋' }
+        ];
+
+
+        let selectedSport = 'bieganie';
+        let topSports = ['bieganie', 'tenis', 'silownia', 'rower'];
+
+
+        function renderSportGrid() {
+            const grid = document.getElementById('sportGrid'); grid.innerHTML = '';
+            topSports.forEach(sportId => {
+                const s = allSports.find(x => x.id === sportId);
+                const isActive = s.id === selectedSport;
+                const btn = document.createElement('button');
+                btn.className = `sport-btn flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition ${isActive ? 'active border-primary bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-transparent bg-white dark:bg-darkcard shadow-sm text-gray-600 dark:text-gray-300'}`;
+                btn.dataset.sport = s.id;
+                btn.innerHTML = `<span class="text-3xl mb-2">${s.emoji}</span><span class="font-medium">${s.name}</span>`;
+                btn.onclick = () => selectSportGlobal(s.id);
+                grid.appendChild(btn);
+            });
+        }
+
+
+        const allSportsList = document.getElementById('allSportsList');
+        if (allSportsList) {
+            allSports.forEach(sport => {
+                const btn = document.createElement('button');
+                btn.className = 'all-sport-btn flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-transparent bg-white dark:bg-darkcard shadow-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 transition';
+                btn.dataset.name = sport.name.toLowerCase();
+                btn.innerHTML = `<span class="text-3xl mb-2">${sport.emoji}</span><span class="font-medium text-sm text-center">${sport.name}</span>`;
+                btn.onclick = () => { selectSportGlobal(sport.id); closeSportSearch(); };
+                allSportsList.appendChild(btn);
+            });
+        }
+
+
+        function openSportSearch() { const m = document.getElementById('sportSearchModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-x-full'), 10); document.getElementById('sportSearchInput').value = ''; filterSports(); }
+        function closeSportSearch() { const m = document.getElementById('sportSearchModal'); m.classList.add('translate-x-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function filterSports() { const val = document.getElementById('sportSearchInput').value.toLowerCase(); document.querySelectorAll('.all-sport-btn').forEach(btn => { btn.style.display = btn.dataset.name.includes(val) ? 'flex' : 'none'; }); }
+        
+        function selectSportGlobal(sportId) {
+            selectedSport = sportId; if(!topSports.includes(sportId)) { topSports.pop(); topSports.unshift(sportId); }
+            renderSportGrid();
+            const sObj = allSports.find(s=>s.id === selectedSport);
+            const citySel = document.getElementById('citySelect');
+            const cityName = citySel.value ? citySel.options[citySel.selectedIndex].text : (currentLang==='pl'?"Wybierz miasto":"Select city");
+            document.getElementById('currentFilterText').innerHTML = `<i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>${cityName} • ${sObj.emoji} ${sObj.name}</span>`;
+        }
+
+
+        // 6. ZAINTERESOWANIA PROFILU
+        let userInterests = [];
+
+
+        function renderProfileInterests() {
+            const container = document.getElementById('profileInterests');
+            container.innerHTML = '';
+            if (userInterests.length === 0) {
+                container.innerHTML = '<span class="text-sm text-gray-500 italic dark:text-gray-400">Brak wybranych zainteresowań.</span>';
+            } else {
+                userInterests.forEach(sportId => {
+                    const s = allSports.find(x => x.id === sportId);
+                    if (s) {
+                        const span = document.createElement('span');
+                        span.className = 'px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-primary rounded-lg text-sm font-semibold flex items-center border border-green-100 dark:border-green-800';
+                        span.innerHTML = `<span class="mr-1">${s.emoji}</span> <span>${s.name}</span> <i class="fas fa-times ml-2 cursor-pointer text-red-400 hover:text-red-600" onclick="removeProfileInterest('${s.id}')"></i>`;
+                        container.appendChild(span);
+                    }
+                });
+            }
+        }
+
+
+        function removeProfileInterest(sportId) { userInterests = userInterests.filter(id => id !== sportId); renderProfileInterests(); }
+
+
+        function openInterestModal() {
+            const m = document.getElementById('interestModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10);
+            document.getElementById('interestSearchInput').value = ''; renderInterestModalList();
+        }
+
+
+        function closeInterestModal() { const m = document.getElementById('interestModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+
+
+        function renderInterestModalList() {
+            const list = document.getElementById('interestModalList'); list.innerHTML = '';
+            allSports.forEach(sport => {
+                if (!userInterests.includes(sport.id)) {
+                    const btn = document.createElement('button');
+                    btn.className = 'interest-item w-full text-left px-4 py-3 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-700 rounded-xl flex items-center hover:border-primary transition mb-1';
+                    btn.dataset.name = sport.name.toLowerCase();
+                    btn.innerHTML = `<span class="text-2xl mr-3">${sport.emoji}</span> <span class="font-medium text-gray-800 dark:text-white">${sport.name}</span>`;
+                    btn.onclick = () => { userInterests.push(sport.id); renderProfileInterests(); closeInterestModal(); };
+                    list.appendChild(btn);
+                }
+            });
+        }
+
+
+        function filterInterestModal() { const val = document.getElementById('interestSearchInput').value.toLowerCase(); document.querySelectorAll('.interest-item').forEach(item => { item.style.display = item.dataset.name.includes(val) ? 'flex' : 'none'; }); }
+
+
+        // 7. I18N
+        const i18n = {
+            pl: {
+                appTitle: "Zacznij trening!", appSubtitle: "Wybierz miasto i sport, aby znaleźć partnerów.", locationLbl: "Lokalizacja", disciplineLbl: "Dyscyplina",
+                btnSearch: "Szukaj partnerów", noProfTitle: "Brak profili", noProfDesc: "Rozszerz kryteria wyszukiwania.", btnChangeSet: "Zmień ustawienia",
+                matchNew: "Nowe Pary", matchMsg: "Wiadomości", botNow: "Teraz", botPreview: "Gotowy na dzisiejszy trening?", botIntro: "Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪",
+                chatAlways: "Zawsze aktywny", chatToday: "Dziś", profTitle: "Twój Profil", profPrem: "Konto Premium Aktywne", profFree: "Plan Darmowy", profName: "Imię, Wiek i Miasto", profBio: "Moje bio", profInt: "Zainteresowania Sportowe",
+                setMain: "Ustawienia", setPref: "Preferencje", setLang: "Język aplikacji", setPush: "Powiadomienia Push", setDark: "Tryb Ciemny",
+                setInfo: "Informacje i Pomoc", setTerms: "Regulamin", setPriv: "Polityka Prywatności", setHelp: "Centrum Pomocy",
+                setLogout: "Wyloguj się", matchReady: "jest gotowy na trening!", matchGoMsg: "Przejdź do wiadomości", matchPlay: "Graj dalej", navSearch: "Szukaj", navChats: "Czaty", navProfile: "Profil", navPosts: "Posty",
+                loginSub: "Zaloguj się, aby zagrać.", logBtn: "Zaloguj się", orLog: "LUB", logApple: "Kontynuuj przez Apple", logGoogle: "Kontynuuj przez Google", logFB: "Kontynuuj przez Facebook", 
+                noAccount: "Nie masz konta?", registerBtn: "Zarejestruj się", regSub: "Stwórz konto i zacznij grać.", createBtn: "Stwórz konto", hasAccount: "Masz już konto?", loginBackBtn: "Zaloguj się",
+                placeholderText: "Napisz wiadomość...", phEmail: "Adres e-mail", phPass: "Hasło", phLogin: "Twój login", fillDataErr: "Uzupełnij wszystkie dane!",
+                phEmailLogin: "Adres e-mail lub login", phCity: "Twoje miasto", filterAll: "Wszystkie", chatAttachPhoto: "Wyślij zdjęcie", chatSuggestVenue: "Zaproponuj miejscówkę", venuesTitle: "Wybierz miejscówkę",
+                onbTitle: "Jeszcze tylko chwila!", onbSub: "Wypełnij podstawowe dane, abyśmy mogli znaleźć Ci partnerów.", phName: "Twoje Imię", phAge: "Twój Wiek (Min. 18 lat)", onbStart: "Zaczynamy!",
+                onbSportOpt: "Ulubiony sport (Opcjonalnie)", addPostTitle: "Nowe ogłoszenie", addPostBtn: "Opublikuj",
+                emailConfTitle: "Potwierdź e-mail", emailConfDesc: "Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą!", btnUnderstand: "Rozumiem"
+            },
+            en: {
+                appTitle: "Start training!", appSubtitle: "Choose city and sport to find partners.", locationLbl: "Location", disciplineLbl: "Discipline",
+                btnSearch: "Find partners", noProfTitle: "No profiles", noProfDesc: "Expand your search criteria.", btnChangeSet: "Change settings",
+                matchNew: "New Matches", matchMsg: "Messages", botNow: "Now", botPreview: "Ready for today's training?", botIntro: "Hi! I'm your virtual assistant. Planning any sports today? 💪",
+                chatAlways: "Always active", chatToday: "Today", profTitle: "Your Profile", profPrem: "Premium Account Active", profFree: "Free Plan", profName: "Name, Age & City", profBio: "My bio", profInt: "Sports Interests",
+                setMain: "Settings", setPref: "Preferences", setLang: "App Language", setPush: "Push Notifications", setDark: "Dark Mode",
+                setInfo: "Info & Help", setTerms: "Terms of Service", setPriv: "Privacy Policy", setHelp: "Help Center",
+                setLogout: "Log out", matchReady: "is ready to train!", matchGoMsg: "Go to messages", matchPlay: "Keep playing", navSearch: "Search", navChats: "Chats", navProfile: "Profile", navPosts: "Posts",
+                loginSub: "Log in to play.", logBtn: "Log in", orLog: "OR", logApple: "Continue with Apple", logGoogle: "Continue with Google", logFB: "Continue with Facebook", 
+                noAccount: "Don't have an account?", registerBtn: "Sign up", regSub: "Create account to start playing.", createBtn: "Create account", hasAccount: "Already have an account?", loginBackBtn: "Log in",
+                placeholderText: "Type a message...", phEmail: "Email address", phPass: "Password", phLogin: "Your username", fillDataErr: "Please fill in all fields!",
+                phEmailLogin: "Email or login", phCity: "Your city", filterAll: "All", chatAttachPhoto: "Send photo", chatSuggestVenue: "Suggest a venue", venuesTitle: "Select a venue",
+                onbTitle: "Just a moment!", onbSub: "Fill in basic info so we can find you partners.", phName: "Your Name", phAge: "Your Age (Min. 18)", onbStart: "Let's go!",
+                onbSportOpt: "Favorite sport (Optional)", addPostTitle: "New post", addPostBtn: "Publish",
+                emailConfTitle: "Confirm your email", emailConfDesc: "We've sent a verification link to your address. Please check your inbox!", btnUnderstand: "I understand"
+            }
+        };
+
+
+        const modalTexts = {
+            pl: { terms: { title: "Regulamin", content: "<p>1. Akceptacja warunków.<br>Zabrania się używania wulgaryzmów.</p>" }, privacy: { title: "Polityka Prywatności", content: "<p>Twoja prywatność jest ważna.</p>" }, help: { title: "Centrum Pomocy", content: "<p>Napisz do nas: support@sportmatcher.pl</p>" } },
+            en: { terms: { title: "Terms of Service", content: "<p>1. Acceptance of Terms.</p>" }, privacy: { title: "Privacy Policy", content: "<p>Your privacy matters.</p>" }, help: { title: "Help Center", content: "<p>Email us: support@sportmatcher.com</p>" } }
+        };
+
+
+        let currentLang = 'pl';
+        function changeLang(val) { currentLang = val; if(document.getElementById('loginLangSelect')) document.getElementById('loginLangSelect').value = val; if(document.getElementById('languageSelect')) document.getElementById('languageSelect').value = val; applyTranslations(currentLang); }
+        document.getElementById('languageSelect').addEventListener('change', (e) => { changeLang(e.target.value); });
+        
+        function applyTranslations(lang) {
+            const dict = i18n[lang];
+            document.querySelectorAll('[data-i18n]').forEach(el => { if (dict[el.getAttribute('data-i18n')]) el.innerText = dict[el.getAttribute('data-i18n')]; });
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => { if (dict[el.getAttribute('data-i18n-ph')]) el.placeholder = dict[el.getAttribute('data-i18n-ph')]; });
+            document.getElementById('chatInput').placeholder = dict.placeholderText;
+            
+            if(document.getElementById('currentFilterText') && document.querySelector('#sportGrid .sport-btn.active span')) {
+                 const sportObj = allSports.find(s => s.id === selectedSport);
+                 const sName = sportObj ? sportObj.name : document.querySelector('#sportGrid .sport-btn.active span:last-child').innerText;
+                 const citySel = document.getElementById('citySelect');
+                 const cityName = citySel.value ? citySel.options[citySel.selectedIndex].text : "Wybierz miasto";
+                 document.getElementById('currentFilterText').innerHTML = `<i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>${cityName} • ${sportObj.emoji} ${sName}</span>`;
+            }
+        }
+
+
+        // 8. TABLICA POSTÓW I DODAWANIE
+        let postsDB = [
+            { id: 1, author: 'Kuba', avatar: 'https://i.pravatar.cc/150?img=11', time: '10 min temu', content: 'Szukamy bramkarza na orlika dzisiaj o 20:00! Hala Orbita.', sport: 'pilkanozna', city: 'Wrocław' },
+            { id: 2, author: 'Zosia', avatar: 'https://i.pravatar.cc/150?img=9', time: '1 godz. temu', content: 'Idę wieczorem pobiegać po parku, ktoś dołączy? Tempo ok. 5:30/km.', sport: 'bieganie', city: 'Wrocław' },
+            { id: 3, author: 'Kasia', avatar: 'https://i.pravatar.cc/150?img=20', time: '5 min temu', content: 'Ktoś chętny zagrać w padla na weekendzie? Znam fajny kort.', sport: 'padel', city: 'Warszawa' }
+        ];
+
+
+        let pendingPostMedia = null;
+        let pendingPostMediaType = null;
+
+
+        function renderPosts() {
+            const container = document.getElementById('postsContainer'); container.innerHTML = '';
+            const cityFilterVal = document.getElementById('postCityFilter').value;
+            const sportFilterVal = document.getElementById('postSportFilter').value;
+            
+            if(!cityFilterVal) {
+                container.innerHTML = `<div class="text-center text-gray-500 py-10 mt-6"><i class="fas fa-map-marker-alt text-4xl mb-4 text-gray-300"></i><br>Wybierz miasto w prawym górnym rogu,<br>aby zobaczyć ogłoszenia.</div>`;
+                return;
+            }
+
+
+            let filtered = postsDB.filter(p => p.city.toLowerCase() === cityFilterVal.toLowerCase());
+            if (sportFilterVal !== 'all') {
+                filtered = filtered.filter(p => p.sport === sportFilterVal);
+            }
+            
+            filtered = filtered.reverse();
+
+
+            if(filtered.length === 0) { 
+                container.innerHTML = `<div class="text-center text-gray-500 py-10 mt-6"><i class="fas fa-ghost text-4xl mb-4 text-gray-300"></i><br>Brak ogłoszeń spełniających kryteria.<br>Bądź pierwszy!</div>`; 
+                return; 
+            }
+
+
+            filtered.forEach(post => {
+                const sportObj = allSports.find(s => s.id === post.sport) || {name: post.sport, emoji: '🏆'};
+                let mediaHtml = '';
+                if(post.media) {
+                    if(post.mediaType && post.mediaType.startsWith('video')) {
+                        mediaHtml = `<video src="${post.media}" controls class="w-full h-48 object-cover rounded-xl mt-2 mb-3 border border-gray-100 dark:border-gray-700 bg-black"></video>`;
+                    } else {
+                        mediaHtml = `<img src="${post.media}" class="w-full h-48 object-cover rounded-xl mt-2 mb-3 border border-gray-100 dark:border-gray-700">`;
+                    }
+                }
+
+
+                container.innerHTML += `
+                    <div class="bg-white dark:bg-darkcard rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors fade-in">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center space-x-2"><img src="${post.avatar}" class="w-8 h-8 rounded-full object-cover bg-gray-200"><span class="font-bold text-sm text-gray-800 dark:text-white">${post.author}</span></div>
+                            <span class="text-xs text-gray-400">${post.time}</span>
+                        </div>
+                        <p class="text-sm text-gray-700 dark:text-gray-300 mb-3 whitespace-pre-wrap">${post.content}</p>
+                        ${mediaHtml}
+                        <div class="flex items-center space-x-2"><span class="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 text-xs font-bold px-2 py-1 rounded-md">${sportObj.emoji} ${sportObj.name}</span></div>
+                    </div>
+                `;
+            });
+        }
+
+
+        function renderNewPostSports() {
+            const dropdown = document.getElementById('newPostSportDropdown'); dropdown.innerHTML = '';
+            allSports.forEach(s => {
+                const btn = document.createElement('div');
+                btn.className = 'new-post-sport-item px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-sm dark:text-white transition';
+                btn.innerHTML = `<span class="mr-2 text-lg w-6">${s.emoji}</span> ${s.name}`;
+                btn.onclick = () => { document.getElementById('newPostSportSearch').value = `${s.emoji} ${s.name}`; document.getElementById('newPostSportValue').value = s.id; toggleNewPostSportDropdown(false); };
+                dropdown.appendChild(btn);
+            });
+        }
+        
+        function toggleNewPostSportDropdown(show) { document.getElementById('newPostSportDropdown').style.display = show ? 'block' : 'none'; }
+        function filterNewPostSports() { const val = document.getElementById('newPostSportSearch').value.toLowerCase(); document.querySelectorAll('.new-post-sport-item').forEach(item => { item.style.display = item.innerText.toLowerCase().includes(val) ? 'flex' : 'none'; }); }
+
+
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('newPostSportDropdown');
+            const searchInput = document.getElementById('newPostSportSearch');
+            if (dropdown && !dropdown.contains(e.target) && e.target !== searchInput) { toggleNewPostSportDropdown(false); }
+        });
+
+
+        function updatePostCounter() { const len = document.getElementById('newPostContent').value.length; document.getElementById('newPostCounter').innerText = `${len}/200 znaków`; }
+
+
+        function handlePostMedia(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            pendingPostMediaType = file.type;
+            const reader = new FileReader();
+            reader.onload = e => {
+                pendingPostMedia = e.target.result;
+                document.getElementById('newPostMediaPreview').classList.remove('hidden');
+                const imgPreview = document.getElementById('newPostImgPreview');
+                const vidPreview = document.getElementById('newPostVidPreview');
+                if(file.type.startsWith('video')) { imgPreview.classList.add('hidden'); vidPreview.src = pendingPostMedia; vidPreview.classList.remove('hidden'); } 
+                else { vidPreview.classList.add('hidden'); imgPreview.src = pendingPostMedia; imgPreview.classList.remove('hidden'); }
+            };
+            reader.readAsDataURL(file);
+        }
+
+
+        function clearPostMedia() { pendingPostMedia = null; pendingPostMediaType = null; document.getElementById('newPostMediaInput').value = ''; document.getElementById('newPostMediaPreview').classList.add('hidden'); }
+
+
+        function openAddPostModal() { 
+            const m = document.getElementById('addPostModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10); 
+            document.getElementById('newPostContent').value = ''; document.getElementById('newPostSportSearch').value = ''; document.getElementById('newPostSportValue').value = ''; document.getElementById('addPostError').classList.add('hidden');
+            clearPostMedia(); updatePostCounter();
+        }
+        
+        function closeAddPostModal() { const m = document.getElementById('addPostModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        
+        function submitNewPost() {
+            const content = document.getElementById('newPostContent').value.trim();
+            const sport = document.getElementById('newPostSportValue').value;
+            const city = document.getElementById('newPostCity').value;
+            const errEl = document.getElementById('addPostError');
+            
+            if(!content || !sport || !city) { errEl.classList.remove('hidden'); return; }
+            
+            postsDB.push({ id: Date.now(), author: document.getElementById('inputName').value || 'Ty', avatar: document.getElementById('profileImage').src, time: 'Teraz', content: content, sport: sport, city: city, media: pendingPostMedia, mediaType: pendingPostMediaType });
+            
+            document.getElementById('postCityFilter').value = city; document.getElementById('postSportFilter').value = 'all';
+            renderPosts(); closeAddPostModal();
+        }
+
+
+        // 9. SWIPE I MATCH
+        let currentCards = []; let matches = []; let activeChatFilters = new Set();
+        const profilesDB = [
+            { id: 1, name: 'Michał', age: 28, city: 'Wrocław', sport: 'bieganie', level: 'Średnio', bio: 'Biegam nad Odrą. Szukam kogoś na tempo 5:30/km.', img: 'https://i.pravatar.cc/400?img=12' },
+            { id: 2, name: 'Ania', age: 25, city: 'Wrocław', sport: 'bieganie', level: 'Początkujący', bio: 'Dopiero zaczynam, przygotowuję się do pierwszych 5km.', img: 'https://i.pravatar.cc/400?img=5' },
+            { id: 4, name: 'Kasia', age: 29, city: 'Wrocław', sport: 'tenis', level: 'Średnio', bio: 'Zazwyczaj gram w Hasta La Vista.', img: 'https://i.pravatar.cc/400?img=20' },
+            { id: 5, name: 'Piotrek', age: 24, city: 'Kraków', sport: 'silownia', level: 'Zaawansowany', bio: 'Szukam kogoś do asekuracji przy ciężkich siadach.', img: 'https://i.pravatar.cc/400?img=11' }
+        ];
+
+
+        const screensApp = ['preferencesScreen', 'swipeScreen', 'messagesScreen', 'profileScreen', 'postsScreen'];
+        function navTo(screenId, btnElement = null) {
+            screensApp.forEach(s => { const el = document.getElementById(s); if(el) { el.classList.add('hidden'); el.classList.remove('fade-in'); } });
+            closeChat();
+            const target = document.getElementById(screenId); target.classList.remove('hidden'); target.classList.add('flex', 'fade-in');
+            if (btnElement) { document.querySelectorAll('.nav-btn').forEach(b => { b.classList.remove('text-primary'); b.classList.add('text-gray-400', 'dark:text-gray-500'); }); btnElement.classList.remove('text-gray-400', 'dark:text-gray-500'); btnElement.classList.add('text-primary'); }
+        }
+
+
+        document.getElementById('startMatchingBtn').addEventListener('click', () => { 
+            const citySel = document.getElementById('citySelect');
+            if(!citySel.value) { document.getElementById('citySelectError').classList.remove('hidden'); return; }
+            document.getElementById('citySelectError').classList.add('hidden');
+            navTo('swipeScreen'); startMatching(); 
+        });
+
+
+        function startMatching() {
+            const cityName = document.getElementById('citySelect').options[document.getElementById('citySelect').selectedIndex].text;
+            const sportObj = allSports.find(s=>s.id === selectedSport);
+            document.getElementById('currentFilterText').innerHTML = `<i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>${cityName} • ${sportObj.emoji} ${sportObj.name}</span>`;
+            
+            let filtered = profilesDB.filter(p => p.city.toLowerCase() === cityName.toLowerCase() && p.sport === selectedSport);
+            currentCards = [...filtered].sort(() => Math.random() - 0.5);
+            renderCards();
+        }
+
+
+        function renderCards() {
+            const cardStack = document.getElementById('cardStack'); cardStack.innerHTML = '';
+            if (currentCards.length === 0) { document.getElementById('noMoreCards').classList.remove('hidden'); document.getElementById('noMoreCards').classList.add('flex'); return; }
+            document.getElementById('noMoreCards').classList.add('hidden'); document.getElementById('noMoreCards').classList.remove('flex');
+            currentCards.slice().reverse().forEach((profile, index) => {
+                const card = document.createElement('div'); card.className = 'profile-card flex flex-col bg-white border border-gray-100'; card.style.zIndex = index;
+                if(index !== currentCards.length - 1) card.style.transform = `scale(${0.95 + (index * 0.01)}) translateY(-${(currentCards.length - 1 - index) * 12}px)`;
+                const pSportObj = allSports.find(s=>s.id === profile.sport) || {emoji: ''};
+                card.innerHTML = `<div class="relative h-2/3 w-full bg-gray-200"><img src="${profile.img}" class="w-full h-full object-cover bg-white"><div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div><div class="absolute bottom-4 left-5 right-5 text-white"><h3 class="text-3xl font-black mb-1 drop-shadow-md">${profile.name}, ${profile.age}</h3><div class="flex items-center text-xs font-bold space-x-2"><span class="bg-primary text-white px-2.5 py-1 rounded-md capitalize">${pSportObj.emoji} ${profile.sport}</span></div></div></div><div class="p-6 h-1/3 flex flex-col justify-center bg-white dark:bg-darkcard"><p class="text-gray-700 dark:text-gray-300 text-lg leading-relaxed font-medium">"${profile.bio}"</p></div>`;
+                cardStack.appendChild(card);
+            });
+        }
+
+
+        document.getElementById('btnNope').addEventListener('click', () => handleAction('nope'));
+        document.getElementById('btnLike').addEventListener('click', () => handleAction('like'));
+
+
+        let pendingMatchProfile = null;
+        function handleAction(action) {
+            if (currentCards.length === 0) return;
+            const stack = document.getElementById('cardStack'); const topCardElement = stack.querySelectorAll('.profile-card')[stack.querySelectorAll('.profile-card').length - 1];
+            const profile = currentCards.shift();
+            if (topCardElement) {
+                topCardElement.classList.add(action === 'like' ? 'swiped-right' : 'swiped-left');
+                if (action === 'like' && (Math.random() < 0.4 || currentCards.length === 0)) setTimeout(() => showMatchModal(profile), 300);
+                setTimeout(() => { topCardElement.remove(); stack.querySelectorAll('.profile-card').forEach(c => c.style.transform = `scale(1) translateY(0)`); if (currentCards.length === 0) renderCards(); }, 300);
+            }
+        }
+
+
+        function showMatchModal(profile) { pendingMatchProfile = profile; document.getElementById('matchImage').src = profile.img; document.getElementById('matchName').innerText = profile.name; document.getElementById('matchModal').classList.remove('hidden'); document.getElementById('matchModal').classList.add('flex'); }
+        function closeMatchModal(goToChat = false) { 
+            document.getElementById('matchModal').classList.add('hidden'); document.getElementById('matchModal').classList.remove('flex'); 
+            if(pendingMatchProfile) {
+                addMatchToChats(pendingMatchProfile);
+                if(goToChat) { navTo('messagesScreen', document.querySelectorAll('.nav-btn')[2]); openChat(pendingMatchProfile.id, pendingMatchProfile.name, pendingMatchProfile.img); }
+                pendingMatchProfile = null;
+            } else if (goToChat) { navTo('messagesScreen', document.querySelectorAll('.nav-btn')[2]); }
+        }
+
+
+        // 10. USTAWIENIA MODALE
+        function openSettings() { const m = document.getElementById('settingsModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10); }
+        function closeSettings() { const m = document.getElementById('settingsModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function openTextModal(type) { const data = modalTexts[currentLang][type]; document.getElementById('textModalTitle').innerText = data.title; document.getElementById('textModalContent').innerHTML = data.content; document.getElementById('textModal').classList.remove('hidden'); setTimeout(() => document.getElementById('textModal').classList.remove('translate-y-full'), 10); }
+        function closeTextModal() { document.getElementById('textModal').classList.add('translate-y-full'); setTimeout(() => document.getElementById('textModal').classList.add('hidden'), 300); }
+
+
+        // 11. CZAT, BOT I MIEJSCÓWKI
+        const chatScreen = document.getElementById('chatScreen'); const messagesContainer = document.getElementById('chatMessages'); const inputField = document.getElementById('chatInput');
+        const defaultBotAvatar = 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff';
+        const apiKey = ""; 
+
+
+        let allChatHistories = {
+            'bot': { name: 'Trener Bot', img: defaultBotAvatar, messages: [{ role: 'model', parts: [{text: 'Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪'}]}] }
+        };
+        let currentChatId = 'bot';
+
+
+        function addMatchToChats(profile) {
+            if(allChatHistories[profile.id]) return; 
+            allChatHistories[profile.id] = { name: profile.name, img: profile.img, messages: [{ role: 'model', parts: [{text: `Hej! Dzięki za match! Kiedy lecimy na trening?`}] }] };
+            
+            const slider = document.getElementById('matchesList');
+            const circle = document.createElement('div'); circle.className = 'flex flex-col items-center cursor-pointer fade-in';
+            circle.onclick = () => openChat(profile.id, profile.name, profile.img);
+            circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${profile.img}" class="w-full h-full rounded-full object-cover bg-white"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300">${profile.name}</span>`;
+            slider.appendChild(circle);
+
+
+            const chatList = document.getElementById('chatsList');
+            const listItem = document.createElement('div'); listItem.className = 'chat-item flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl cursor-pointer transition fade-in';
+            listItem.dataset.sport = profile.sport; listItem.onclick = () => openChat(profile.id, profile.name, profile.img);
+            listItem.innerHTML = `<img src="${profile.img}" class="w-14 h-14 rounded-full mr-4 object-cover bg-white"><div class="flex-1"><div class="flex justify-between items-center mb-1"><h4 class="font-bold text-gray-900 dark:text-white">${profile.name}</h4><span class="text-xs text-gray-400">Nowy</span></div><p class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[200px]" id="preview-msg-${profile.id}">Rozpocznij konwersację...</p></div><div class="w-3 h-3 bg-primary rounded-full ml-2"></div>`;
+            chatList.insertBefore(listItem, chatList.firstChild);
+            matches.push(profile); 
+            
+            if(!activeChatFilters.has(profile.sport)) {
+                activeChatFilters.add(profile.sport); const sObj = allSports.find(s=>s.id === profile.sport);
+                if(sObj) { const fBar = document.getElementById('chatFilters'); const btn = document.createElement('button'); btn.className = "chat-filter-btn px-4 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full text-xs font-bold transition"; btn.onclick = function() { filterChats(profile.sport, this); }; btn.innerHTML = `${sObj.emoji} ${sObj.name}`; fBar.appendChild(btn); }
+            }
+        }
+
+
+        function filterChats(sportId, btnElement) { document.querySelectorAll('.chat-filter-btn').forEach(btn => { btn.classList.remove('bg-primary', 'text-white'); btn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300'); }); btnElement.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300'); btnElement.classList.add('bg-primary', 'text-white'); document.querySelectorAll('.chat-item').forEach(item => { if(sportId === 'all' || item.dataset.sport === sportId || item.dataset.sport === 'bot') { item.style.display = 'flex'; } else { item.style.display = 'none'; } }); }
+        
+        function getSystemPrompt() {
+            if(currentChatId === 'bot') {
+                return `Jesteś 'Trener Bot', asystentem w SportMatcher. ZAKAZ wulgaryzmów.
+STAN KONTA UŻYTKOWNIKA: ${isPro ? 'PRO (PREMIUM)' : 'DARMOWE'}.
+Jeśli użytkownik prosi o plan treningowy:
+- Gdy stan konta to PRO, stwórz mu szczegółowy, "perfekcyjny i skuteczny" plan treningowy.
+- Gdy stan konta to DARMOWE, grzecznie, ale STANOWCZO odmów, i powiedz: "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!" i nic więcej nie podawaj.
+Poza tym krótko motywuj do treningu.`;
+            } else {
+                const matchInfo = matches.find(m => m.id === currentChatId) || {name: "Sportowiec"};
+                return `Wcielasz się w postać sportowca o imieniu ${matchInfo.name}. Jesteście parą w aplikacji (zmatchowaliście się). Bądź przyjacielski, odpisuj BARDZO KRÓTKO (1 zdanie). Zaproponuj wspólny trening. ZERO wulgaryzmów.`;
+            }
+        }
+
+
+        function toggleAttachMenu() { document.getElementById('attachMenu').classList.toggle('hidden'); }
+        function sendChatPhoto(event) { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { appendMessageUI(`<img src="${e.target.result}" class="rounded-xl mt-1 max-w-full h-auto border border-gray-100 dark:border-gray-700 shadow-sm" style="max-height: 200px; object-fit: cover;">`, true); toggleAttachMenu(); }; reader.readAsDataURL(event.target.files[0]); } }
+        
+        function requestLocationAndOpenVenues() {
+            toggleAttachMenu();
+            const m = document.getElementById('venuesModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10);
+            document.getElementById('gpsPermission').classList.remove('hidden'); document.getElementById('gpsPermission').classList.add('flex');
+            document.getElementById('venuesLoading').classList.add('hidden'); document.getElementById('venuesLoading').classList.remove('flex');
+            document.getElementById('venuesResults').classList.add('hidden'); document.getElementById('venuesResults').classList.remove('flex');
+        }
+
+
+        function openVenuesModal() { 
+            let matchName = currentChatId === 'bot' ? 'Trener Bot' : (matches.find(m=>m.id==currentChatId)?.name || 'Match');
+            document.getElementById('vLoadMatchName').innerText = matchName; document.getElementById('vmMatchName').innerText = matchName;
+            
+            document.getElementById('gpsPermission').classList.add('hidden'); document.getElementById('gpsPermission').classList.remove('flex');
+            document.getElementById('venuesLoading').classList.remove('hidden'); document.getElementById('venuesLoading').classList.add('flex');
+
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => { loadVenues(position.coords.latitude, position.coords.longitude); },
+                    (error) => { console.log("Brak zgody na GPS, ładuję domyślne."); loadVenues(null, null); }
+                );
+            } else { loadVenues(null, null); }
+        }
+
+
+        function loadVenues(lat, lng) {
+            setTimeout(() => {
+                document.getElementById('venuesLoading').classList.add('hidden'); document.getElementById('venuesLoading').classList.remove('flex');
+                document.getElementById('venuesResults').classList.remove('hidden'); document.getElementById('venuesResults').classList.add('flex');
+                
+                let matchSportId = selectedSport;
+                if (currentChatId !== 'bot') { const matchProfile = matches.find(m => m.id == currentChatId); if (matchProfile) matchSportId = matchProfile.sport; }
+                const city = document.getElementById('inputProfileCity').value || 'Wrocław';
+                const sportObj = allSports.find(s => s.id === matchSportId) || allSports[0];
+                
+                const query = encodeURIComponent(`${city} ${sportObj.name}`);
+                document.getElementById('gmapIframe').src = `https://maps.google.com/maps?q=${query}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+                renderVenuesList(sportObj, query);
+            }, 1800);
+        }
+        
+        function closeVenuesModal() { const m = document.getElementById('venuesModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        
+        function renderVenuesList(sportObj, cityQuery) {
+            const list = document.getElementById('venuesDynamicList'); list.innerHTML = '';
+            const mockVenues = [
+                { name: `Darmowa strefa - ${sportObj.name}`, free: true, price: 'Darmowe', dist: '1.2 km', q: `${cityQuery} public` },
+                { name: `Klub PRO: ${sportObj.name}`, free: false, price: 'Od 40 PLN', dist: '1.5 km', q: `${cityQuery} club` },
+                { name: `Obiekt MOSiR (${sportObj.name})`, free: false, price: 'Karnet / Multisport', dist: '2.1 km', q: `${cityQuery} mosir` }
+            ];
+
+
+            mockVenues.forEach((v, index) => {
+                const btn = document.createElement('div');
+                btn.className = "w-full bg-white dark:bg-darkcard p-4 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-primary transition flex flex-col shadow-sm fade-in";
+                btn.style.animationDelay = `${index * 0.1}s`;
+                const badge = v.free ? `<span class="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 uppercase border border-green-200 dark:border-green-800">Darmowe</span>` : `<span class="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 uppercase border border-orange-200 dark:border-orange-800">Płatne</span>`;
+                btn.innerHTML = `<div class="flex justify-between items-start w-full cursor-pointer" onclick="sendVenue('${v.name}', ${v.free})"><h4 class="font-bold text-gray-900 dark:text-white flex items-center leading-tight"><span class="text-lg mr-2">${sportObj.emoji}</span> ${v.name}</h4>${badge}</div><div class="flex items-center text-xs text-gray-500 mt-2 space-x-4 font-medium mb-3"><span class="flex items-center"><i class="fas fa-walking mr-1.5 text-gray-400"></i> ${v.dist}</span><span class="flex items-center"><i class="fas fa-ticket-alt mr-1.5 text-gray-400"></i> ${v.price}</span></div><button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(v.q)}')" class="w-full py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition flex justify-center items-center"><i class="fas fa-route mr-2"></i> Trasa 🗺️</button>`;
+                list.appendChild(btn);
+            });
+        }
+
+
+        function sendVenue(venueName, isFree) { 
+            const costStr = isFree ? '(Darmowe 🟢)' : '(Płatne 🟡)';
+            const txt = `📍 Zaproponowałem miejscówkę (Połowa drogi):\n<b>${venueName}</b> ${costStr}`; 
+            appendMessageUI(txt, true); allChatHistories[currentChatId].messages.push({ role: "user", parts: [{ text: txt }] }); closeVenuesModal(); setTimeout(() => { triggerBotResponse(); }, 1000);
+        }
+        
+        document.addEventListener('click', function(event) { 
+            const menu = document.getElementById('attachMenu'); 
+            if(menu && !menu.classList.contains('hidden')) { 
+                const plusBtn = menu.previousElementSibling; 
+                if (!menu.contains(event.target) && !plusBtn.contains(event.target)) { menu.classList.add('hidden'); } 
+            } 
+        });
+
+
+        function openChat(id, name = 'Trener Bot', img = defaultBotAvatar) {
+            currentChatId = id;
+            if(!allChatHistories[id]) { allChatHistories[id] = { name: name, img: img, messages: [{ role: 'model', parts: [{text: `Hej! Kiedy trening?`}] }] }; }
+            document.getElementById('chatHeaderName').innerHTML = `${name} ${id === 'bot' ? '<i class="fas fa-robot text-gray-400 ml-1"></i>' : '<i class="fas fa-check-circle text-primary text-xs ml-1"></i>'}`;
+            document.getElementById('chatHeaderImg').src = img;
+            document.getElementById('chatHeaderStatus').innerText = id === 'bot' ? (currentLang === 'pl' ? 'Zawsze aktywny' : 'Always active') : (currentLang === 'pl' ? 'Teraz online' : 'Online now');
+            renderCurrentChat();
+            chatScreen.classList.remove('hidden'); requestAnimationFrame(() => chatScreen.classList.remove('translate-x-full')); scrollToBottom();
+        }
+        function closeChat() { chatScreen.classList.add('translate-x-full'); setTimeout(() => chatScreen.classList.add('hidden'), 300); }
+        function handleChatEnter(e) { if (e.key === 'Enter') sendMessage(); }
+        function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
+
+
+        function renderCurrentChat() {
+            messagesContainer.innerHTML = '<div class="text-center my-4"><span class="text-xs text-gray-400 font-medium bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-full">Dziś</span></div>';
+            const history = allChatHistories[currentChatId].messages;
+            history.forEach(msg => { const isUser = msg.role === 'user'; appendMessageUI(msg.parts[0].text, isUser, isUser ? '' : allChatHistories[currentChatId].img); });
+        }
+
+
+        function appendMessageUI(text, isUser = true, avatarUrl = '') {
+            const wrapper = document.createElement('div'); wrapper.className = `flex ${isUser ? 'justify-end' : 'items-end space-x-2'} mb-4 fade-in`;
+            let html = !isUser ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white">` : '';
+            html += `<div class="${isUser ? 'bg-primary text-white rounded-2xl rounded-br-none' : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-bl-none shadow-sm'} px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap">${text}</div>`;
+            wrapper.innerHTML = html; messagesContainer.appendChild(wrapper); scrollToBottom();
+            const previewEl = document.getElementById(`preview-msg-${currentChatId}`); if(previewEl) previewEl.innerText = isUser ? `Ty: ${text.substring(0,15)}...` : text.substring(0,15)+'...';
+        }
+
+
+        function showTypingIndicator() {
+            const wrapper = document.createElement('div'); wrapper.id = 'typingIndicator'; wrapper.className = `flex items-end space-x-2 mb-4 fade-in`;
+            wrapper.innerHTML = `<img src="${allChatHistories[currentChatId].img}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white"><div class="bg-white border border-gray-100 dark:bg-gray-800 dark:border-gray-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex space-x-1"><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div></div>`;
+            messagesContainer.appendChild(wrapper); scrollToBottom();
+        }
+
+
+        async function fetchWithRetry(url, options, retries = 5) {
+            let delay = 1000; for (let i = 0; i < retries; i++) { try { const response = await fetch(url, options); if (response.ok) return await response.json(); } catch (err) { if (i === retries - 1) throw err; } await new Promise(res => setTimeout(res, delay)); delay *= 2; } throw new Error("API błąd");
+        }
+
+
+        async function triggerBotResponse() {
+            showTypingIndicator();
+            if (!apiKey) {
+                setTimeout(() => { 
+                    document.getElementById('typingIndicator')?.remove(); 
+                    let reply = "";
+                    if(currentChatId === 'bot') {
+                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga API by działać pełniej)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
+                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi!`; }
+                    appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
+                    allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: reply }] }); 
+                }, 1000); return;
+            }
+            try {
+                const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: allChatHistories[currentChatId].messages, systemInstruction: { parts: [{ text: getSystemPrompt() }] } }) });
+                document.getElementById('typingIndicator')?.remove();
+                const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd sieci.";
+                appendMessageUI(botReply, false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
+            } catch (error) { document.getElementById('typingIndicator')?.remove(); appendMessageUI("Błąd serwera.", false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.pop(); }
+        }
+
+
+        async function sendMessage() {
+            const text = inputField.value.trim(); if (!text) return;
+            inputField.value = ''; inputField.focus(); appendMessageUI(text, true); 
+            allChatHistories[currentChatId].messages.push({ role: "user", parts: [{ text }] });
+            triggerBotResponse();
+        }
+    </script>
+</body>
+</html>
