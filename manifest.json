@@ -10,7 +10,11 @@
   "orientation": "portrait",
   "dir": "ltr",
   "lang": "pl-PL",
-  "categories": ["sports", "social", "lifestyle"],
+  "categories": [
+    "sports",
+    "social",
+    "lifestyle"
+  ],
   "icons": [
     {
       "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Soccerball.svg/512px-Soccerball.svg.png",
@@ -33,13 +37,13 @@
   ],
   "screenshots": [
     {
-      "src": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
+      "src": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&amp;q=80",
       "sizes": "800x1200",
       "type": "image/jpeg",
       "form_factor": "narrow"
     },
     {
-      "src": "https://images.unsplash.com/photo-1526502613354-39f1aa27d7c9?w=1200&q=80",
+      "src": "https://images.unsplash.com/photo-1526502613354-39f1aa27d7c9?w=1200&amp;q=80",
       "sizes": "1200x800",
       "type": "image/jpeg",
       "form_factor": "wide"
