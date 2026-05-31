@@ -39,23 +39,29 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
-          getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-          sendEmailVerification, GoogleAuthProvider, signInWithPopup, deleteUser,
-          EmailAuthProvider, reauthenticateWithCredential
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        
-        import { 
-          getFirestore, doc, setDoc, collection, getDocs, addDoc, query, where 
+          getFirestore, doc, setDoc, collection, getDocs, addDoc, query, where, deleteDoc 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { 
+          getAuth, 
+          createUserWithEmailAndPassword, 
+          signInWithEmailAndPassword,
+          sendEmailVerification,
+          GoogleAuthProvider,
+          signInWithPopup,
+          deleteUser,
+          EmailAuthProvider,
+          reauthenticateWithCredential
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
       
         // TWOJE PRAWDZIWE KLUCZE Z FIREBASE!
         const firebaseConfig = {
-          apiKey: "TWOJ_API_KEY",
-          authDomain: "twoj-projekt.firebaseapp.com",
-          projectId: "twoj-projekt",
-          storageBucket: "twoj-projekt.appspot.com",
-          messagingSenderId: "123456789",
-          appId: "1:12345:web:abcd"
+          apiKey: "AIzaSyAM6U506cQ3OqXQWqNFRTSRECRZdY0fNNE",
+          authDomain: "sport-matcher.firebaseapp.com",
+          projectId: "sport-matcher",
+          storageBucket: "sport-matcher.firebasestorage.app",
+          messagingSenderId: "896516657798",
+          appId: "1:896516657798:web:80745d98121b019dea3707",
+          measurementId: "G-1M2J6X36ZK"
         };
       
         const app = initializeApp(firebaseConfig);
