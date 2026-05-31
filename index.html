@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Sport Matcher</title>
+    
+    <!-- PWA / NATIVE APP META TAGS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#022c22" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=SM&background=22c55e&color=fff&size=512">
+    <link rel="manifest" href="manifest.json">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         if (window.tailwind) {
@@ -25,20 +35,18 @@
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- FIREBASE LOGOWANIE I REJESTRACJA -->
+    <!-- FIREBASE LOGOWANIE I BAZA DANYCH (Firestore) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
-          getAuth, 
-          createUserWithEmailAndPassword, 
-          signInWithEmailAndPassword,
-          sendEmailVerification,
-          GoogleAuthProvider,
-          signInWithPopup,
-          deleteUser,
-          EmailAuthProvider,
-          reauthenticateWithCredential
+          getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+          sendEmailVerification, GoogleAuthProvider, signInWithPopup, deleteUser,
+          EmailAuthProvider, reauthenticateWithCredential
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        
+        import { 
+          getFirestore, doc, setDoc, collection, getDocs, addDoc, query, where 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       
         // TWOJE PRAWDZIWE KLUCZE Z FIREBASE!
         const firebaseConfig = {
@@ -53,7 +61,13 @@
       
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
+        
+        // Udostępnienie instancji Firebase na zewnątrz do dolnego skryptu
+        window.auth = auth;
+        window.db = db;
+        window.firestore = { doc, setDoc, collection, getDocs, addDoc, query, where };
       
         window.realEmailRegister = (btn) => {
           const email = document.getElementById('regEmailInput').value.trim();
@@ -73,28 +87,15 @@
       
           createUserWithEmailAndPassword(auth, email, pass)
             .then((userCredential) => {
-              sendEmailVerification(userCredential.user)
-                .then(() => {
-                  btn.innerHTML = origText;
-                  btn.disabled = false;
+              sendEmailVerification(userCredential.user).then(() => {
+                  btn.innerHTML = origText; btn.disabled = false;
                   document.getElementById('loginScreen').classList.add('hidden');
-                  const confScreen = document.getElementById('emailConfirmModal');
-                  if(confScreen) {
-                      confScreen.classList.remove('hidden');
-                      confScreen.classList.add('flex');
-                  }
-                });
-            })
-            .catch((error) => {
-              btn.innerHTML = origText;
-              btn.disabled = false;
-              if (error.code === 'auth/email-already-in-use') {
-                  errEl.innerText = "Ten e-mail jest już zajęty!";
-              } else if (error.code === 'auth/weak-password') {
-                  errEl.innerText = "Hasło jest za słabe (min. 6 znaków)!";
-              } else {
-                  errEl.innerText = "Błąd rejestracji: " + error.message;
-              }
+                  document.getElementById('emailConfirmModal').classList.remove('hidden');
+                  document.getElementById('emailConfirmModal').classList.add('flex');
+              });
+            }).catch((error) => {
+              btn.innerHTML = origText; btn.disabled = false;
+              errEl.innerText = error.code === 'auth/email-already-in-use' ? "Ten e-mail jest już zajęty!" : "Błąd rejestracji: " + error.message;
               errEl.classList.remove('hidden');
             });
         };
@@ -103,66 +104,35 @@
           const email = document.getElementById('loginEmailInput').value.trim();
           const pass = document.getElementById('loginPassInput').value.trim();
           const errEl = document.getElementById('loginError');
-      
-          if(!email || !pass) { 
-              errEl.innerText = "Uzupełnij wszystkie dane!";
-              errEl.classList.remove('hidden'); 
-              return; 
-          }
+          if(!email || !pass) { errEl.classList.remove('hidden'); return; }
           
           const origText = btn.innerHTML;
-          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
-          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>'; btn.disabled = true;
 
           signInWithEmailAndPassword(auth, email, pass)
             .then((userCredential) => {
-              btn.innerHTML = origText;
-              btn.disabled = false;
-              if (!userCredential.user.emailVerified) {
-                  errEl.innerText = "Najpierw potwierdź adres e-mail!";
-                  errEl.classList.remove('hidden');
-                  return;
-              }
-              if(typeof window.proceedToApp === 'function') {
-                  window.proceedToApp();
-              }
-            })
-            .catch((error) => {
-              btn.innerHTML = origText;
-              btn.disabled = false;
-              if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-                  errEl.innerText = "Błędny e-mail lub hasło!";
-              } else {
-                  errEl.innerText = "Błąd: " + error.message;
-              }
-              errEl.classList.remove('hidden');
+              btn.innerHTML = origText; btn.disabled = false;
+              if (!userCredential.user.emailVerified) { errEl.innerText = "Potwierdź e-mail!"; errEl.classList.remove('hidden'); return; }
+              if(typeof window.proceedToApp === 'function') window.proceedToApp();
+            }).catch((error) => {
+              btn.innerHTML = origText; btn.disabled = false;
+              errEl.innerText = "Błędny e-mail lub hasło!"; errEl.classList.remove('hidden');
             });
         };
 
         window.realGoogleLogin = () => {
-          signInWithPopup(auth, googleProvider)
-            .then((result) => {
-              if(typeof window.proceedToApp === 'function') {
-                  window.proceedToApp();
-              }
-            })
-            .catch((error) => {
-              alert("Błąd logowania Google: " + error.message);
-            });
+          signInWithPopup(auth, googleProvider).then((result) => {
+              if(typeof window.proceedToApp === 'function') window.proceedToApp();
+          }).catch((error) => { alert("Błąd logowania Google: " + error.message); });
         };
 
         window.openDeleteAccountModal = () => {
             const user = auth.currentUser;
             if(!user) return;
-            
-            // Ukryj/pokaż pole na hasło w zależności od metody logowania
             const passContainer = document.getElementById('deletePassContainer');
-            if (user.providerData.some(p => p.providerId === 'password')) {
-                passContainer.classList.remove('hidden');
-            } else {
-                passContainer.classList.add('hidden');
-            }
-
+            if (user.providerData.some(p => p.providerId === 'password')) passContainer.classList.remove('hidden');
+            else passContainer.classList.add('hidden');
+            
             document.getElementById('deleteAccountModal').classList.remove('hidden');
             document.getElementById('deleteAccountModal').classList.add('flex');
             document.getElementById('deletePassInput').value = '';
@@ -179,12 +149,11 @@
             const errEl = document.getElementById('deleteError');
             const user = auth.currentUser;
 
-            if(!user) { errEl.innerText = "Błąd: Brak zalogowanego użytkownika."; errEl.classList.remove('hidden'); return; }
+            if(!user) return;
             if(!pass && user.providerData.some(p => p.providerId === 'password')) { errEl.innerText = "Podaj hasło!"; errEl.classList.remove('hidden'); return; }
 
             const origText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
-            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>'; btn.disabled = true;
 
             if(user.providerData.some(p => p.providerId === 'password')) {
                 const credential = EmailAuthProvider.credential(user.email, pass);
@@ -193,25 +162,17 @@
                         alert("Konto zostało pomyślnie usunięte z bazy danych.");
                         closeDeleteAccountModal();
                         if(typeof window.performLogout === 'function') window.performLogout();
-                    }).catch(err => {
-                        errEl.innerText = "Błąd usuwania: " + err.message; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                     });
-                }).catch(err => {
-                    errEl.innerText = "Podano błędne hasło!"; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
-                });
+                }).catch(err => { errEl.innerText = "Błędne hasło!"; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false; });
             } else {
                 deleteUser(user).then(() => {
-                    alert("Konto zostało usunięte.");
-                    closeDeleteAccountModal();
+                    alert("Konto zostało usunięte."); closeDeleteAccountModal();
                     if(typeof window.performLogout === 'function') window.performLogout();
-                }).catch(err => {
-                    if(err.code === 'auth/requires-recent-login') errEl.innerText = "Wyloguj i zaloguj się ponownie (Google), by móc usunąć konto.";
-                    else errEl.innerText = "Błąd: " + err.message;
-                    errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                 });
             }
         };
     </script>
+
     <style>
         :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; min-height: 100vh; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
@@ -263,17 +224,14 @@
                     <stop offset="100%" stop-color="#facc15"/>
                 </linearGradient>
             </defs>
-            <!-- Ogień z 3 kolcami -->
-            <path d="M50 85 C 10 85, 10 45, 30 35 C 35 45, 40 45, 45 25 C 47 15, 50 5, 50 5 C 50 5, 53 15, 55 25 C 60 45, 65 45, 70 35 C 90 45, 90 85, 50 85 Z" fill="url(#flameGrad)"/>
-            
-            <!-- Piłka Nożna -->
+            <path d="M50 85 C 10 85, 5 45, 20 15 C 30 40, 40 40, 50 15 C 60 40, 70 40, 80 15 C 95 45, 90 85, 50 85 Z" fill="url(#flameGrad)"/>
             <circle cx="50" cy="65" r="18" fill="#ffffff"/>
-            <polygon points="50,55 44,59 46,67 54,67 56,59" fill="#1f2937"/>
-            <line x1="50" y1="55" x2="50" y2="47" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="44" y1="59" x2="35" y2="57" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="46" y1="67" x2="41" y2="76" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="54" y1="67" x2="59" y2="76" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="56" y1="59" x2="65" y2="57" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <polygon points="50,56 43,61 46,69 54,69 57,61" fill="#1f2937"/>
+            <line x1="50" y1="56" x2="50" y2="47" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="43" y1="61" x2="35" y2="57" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="46" y1="69" x2="41" y2="78" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="54" y1="69" x2="59" y2="78" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="57" y1="61" x2="65" y2="57" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
             <circle cx="50" cy="65" r="18" stroke="#1f2937" stroke-width="3" fill="none"/>
         </svg>`;
     </script>
@@ -313,14 +271,14 @@
                         <p class="text-gray-500 dark:text-gray-400 font-medium mb-6 text-center" data-i18n="loginSub">Zaloguj się, aby zagrać.</p>
                         
                         <div class="w-full space-y-3 mb-6">
-                            <button onclick="proceedToApp()" class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-apple text-xl mr-3 mb-1"></i><span class="font-semibold text-sm" data-i18n="logApple">Kontynuuj przez Apple</span>
                             </button>
                             <button onclick="realGoogleLogin(this)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                 <span class="font-semibold text-sm" data-i18n="logGoogle">Kontynuuj przez Google</span>
                             </button>
-                            <button onclick="proceedToApp()" class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-facebook-f text-lg mr-3"></i><span class="font-semibold text-sm" data-i18n="logFB">Kontynuuj przez Facebook</span>
                             </button>
                         </div>
@@ -386,19 +344,19 @@
             </div>
         </div>
 
-        <!-- 3.1 EKRAN POTWIERDZENIA E-MAIL (PO REJESTRACJI) -->
+        <!-- 3.1 EKRAN POTWIERDZENIA E-MAIL -->
         <div id="emailConfirmModal" class="absolute inset-0 z-[9500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden items-center justify-center text-center transition-colors duration-300">
             <div class="w-24 h-24 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mb-6">
                 <i class="fas fa-envelope-open-text text-5xl"></i>
             </div>
             <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
-            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!</p>
+            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!</p>
             <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
                 Zrozumiałem
             </button>
         </div>
 
-        <!-- 3.5 EKRAN ONBOARDINGU (Wiek 18+ i Miasto) -->
+        <!-- 3.5 EKRAN ONBOARDINGU -->
         <div id="onboardingScreen" class="absolute inset-0 z-[8500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden overflow-hidden transition-colors duration-300">
             <div class="flex flex-col items-center mt-4 mb-8">
                 <div class="w-20 h-20 mb-3 drop-shadow-md" id="onboardingLogoContainer"></div>
@@ -424,7 +382,6 @@
                     <div class="relative">
                         <i class="fas fa-heart absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input type="text" id="onbSport" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="onbSportOpt" placeholder="Ulubiony sport (Opcjonalnie)" oninput="filterOnboardingSports()" onfocus="toggleOnbSportDropdown(true)" autocomplete="off">
-                        <!-- Dropdown dla autouzupełniania -->
                         <div id="onbSportDropdown" class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-y-auto"></div>
                     </div>
                     <p id="onbError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
@@ -452,6 +409,7 @@
             <!-- Ekran Preferencji (Szukaj) -->
             <main id="preferencesScreen" class="flex-1 overflow-y-auto p-6 hidden flex-col pt-10 bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
                 <div class="text-center mb-8 mt-2 flex flex-col items-center">
+                    <div class="w-28 h-28 mb-3 drop-shadow-lg" id="mainScreenLogoContainer"></div>
                     <h2 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white" data-i18n="appTitle">Zacznij trening!</h2>
                     <p class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="appSubtitle">Wybierz miasto i sport, aby znaleźć partnerów.</p>
                 </div>
@@ -489,21 +447,18 @@
                 </button>
             </main>
 
-            <!-- NOWY EKRAN POSTÓW (Tablica) -->
+            <!-- EKRAN POSTÓW -->
             <main id="postsScreen" class="flex-1 overflow-y-auto p-4 hidden flex-col bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
                 <div class="flex flex-wrap justify-between items-center mb-4 px-2 gap-3">
                     <h2 class="text-2xl font-bold text-gray-900 dark:text-white" data-i18n="navPosts">Posty</h2>
                     <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
-                        <!-- Filtr po sporcie -->
                         <div class="bg-white dark:bg-darkcard px-2 py-1.5 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 shadow-sm flex items-center relative">
                             <i class="fas fa-search text-primary ml-1 mr-1"></i>
                             <select id="postSportFilter" class="bg-transparent outline-none appearance-none pr-5 pl-1 font-bold cursor-pointer text-gray-700 dark:text-gray-300 z-10 w-24" onchange="renderPosts()">
                                 <option value="all">Wszystkie</option>
-                                <!-- Pozostałe dynamicznie w JS -->
                             </select>
                             <i class="fas fa-chevron-down text-xs text-gray-400 absolute right-2 pointer-events-none"></i>
                         </div>
-                        <!-- Filtr po mieście -->
                         <div class="bg-white dark:bg-darkcard px-2 py-1.5 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 shadow-sm flex items-center relative">
                             <i class="fas fa-map-marker-alt text-primary ml-1 mr-1"></i>
                             <select id="postCityFilter" class="bg-transparent outline-none appearance-none pr-5 pl-1 font-bold cursor-pointer text-gray-700 dark:text-gray-300 z-10 w-24" onchange="renderPosts()">
@@ -524,11 +479,8 @@
                     </div>
                 </div>
                 
-                <div id="postsContainer" class="space-y-4">
-                    <!-- Posty generowane dynamicznie -->
-                </div>
+                <div id="postsContainer" class="space-y-4"></div>
                 
-                <!-- Floating Action Button (Dodaj Post) -->
                 <button onclick="openAddPostModal()" class="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition z-40">
                     <i class="fas fa-plus text-xl"></i>
                 </button>
@@ -553,7 +505,7 @@
                 <div id="noMoreCards" class="hidden absolute inset-0 flex-col items-center justify-center p-6 text-center z-[-1]">
                     <div class="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4"><i class="fas fa-satellite-dish text-3xl text-gray-400"></i></div>
                     <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2" data-i18n="noProfTitle">Brak profili</h3>
-                    <p class="text-gray-500 dark:text-gray-400 mb-6 text-sm" data-i18n="noProfDesc">Rozszerz kryteria wyszukiwania.</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-6 text-sm" data-i18n="noProfDesc">Zmień filtry, by poszukać ponownie.</p>
                     <button onclick="navTo('preferencesScreen')" class="px-6 py-3 bg-white dark:bg-darkcard border border-gray-200 dark:border-gray-700 font-semibold rounded-full shadow-sm text-gray-800 dark:text-gray-200" data-i18n="btnChangeSet">Zmień ustawienia</button>
                 </div>
             </main>
@@ -766,7 +718,7 @@
                         <label class="block text-xs font-bold text-gray-400 uppercase mb-1" data-i18n="profName">Imię, Wiek i Miasto</label>
                         <div id="viewNameAge" class="flex justify-between items-center">
                             <div class="font-bold text-lg text-gray-800 dark:text-white">
-                                <span id="displayName">Kamil</span>, <span id="displayAge">28</span>
+                                <span id="displayName">Ty</span>, <span id="displayAge">...</span>
                                 <div id="displayCity" class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-0.5"><i class="fas fa-map-marker-alt text-primary mr-1"></i> <span id="displayCityText">Wrocław</span></div>
                             </div>
                             <button onclick="toggleEdit('NameAge')" class="text-primary hover:bg-green-50 dark:hover:bg-gray-800 p-2 rounded-full transition"><i class="fas fa-edit"></i></button>
@@ -816,7 +768,7 @@
                         <div class="bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
                             <div class="px-4 py-3 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
                                 <span class="font-medium text-gray-700 dark:text-gray-200" data-i18n="setLang">Język aplikacji</span>
-                                <select id="languageSelect" class="text-sm border-none bg-transparent text-primary font-bold focus:ring-0 cursor-pointer outline-none text-right">
+                                <select id="languageSelect" class="text-sm border-none bg-transparent text-primary font-bold focus:ring-0 cursor-pointer outline-none text-right" onchange="changeLang(this.value)">
                                     <option value="pl">🇵🇱 PL</option>
                                     <option value="en">🇬🇧 EN</option>
                                 </select>
@@ -958,7 +910,7 @@
 
     <!-- PONIŻEJ ODBUDOWANY, CZYSTY KOD JAVASCRIPT BEZ DUPLIKATÓW -->
     <script>
-        // Przywrócenie renderowania loga (bezpieczne, odporne na null)
+        // Przywrócenie renderowania loga
         ['splashLogoContainer', 'loadingLogoContainer', 'loginLogoContainer', 'onboardingLogoContainer', 'mainScreenLogoContainer', 'headerLogoContainer'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.innerHTML = SVG_LOGO;
@@ -966,6 +918,48 @@
 
         // 1. ZARZĄDZANIE EKRANEM STARTOWYM
         function toggleDarkMode() { document.documentElement.classList.toggle('dark'); }
+
+        // Baza sportów
+        const allSports = [
+            { id: 'bieganie', name: 'Bieganie', icon: 'fa-shoe-prints', emoji: '🏃' }, { id: 'tenis', name: 'Tenis', icon: 'fa-table-tennis', emoji: '🎾' },
+            { id: 'silownia', name: 'Siłownia', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'rower', name: 'Rower', icon: 'fa-bicycle', emoji: '🚴' },
+            { id: 'koszykowka', name: 'Koszykówka', icon: 'fa-basketball-ball', emoji: '🏀' }, { id: 'siatkowka', name: 'Siatkówka', icon: 'fa-volleyball-ball', emoji: '🏐' },
+            { id: 'plywanie', name: 'Pływanie', icon: 'fa-swimmer', emoji: '🏊' }, { id: 'squash', name: 'Squash', icon: 'fa-stopwatch', emoji: '🏸' },
+            { id: 'pilkanozna', name: 'Piłka nożna', icon: 'fa-futbol', emoji: '⚽' }, { id: 'joga', name: 'Joga/Pilates', icon: 'fa-om', emoji: '🧘' },
+            { id: 'wspinaczka', name: 'Wspinaczka', icon: 'fa-mountain', emoji: '🧗' }, { id: 'rolki', name: 'Rolki', icon: 'fa-skating', emoji: '🛼' },
+            { id: 'pingpong', name: 'Tenis stołowy', icon: 'fa-table-tennis', emoji: '🏓' }, { id: 'badminton', name: 'Badminton', icon: 'fa-feather', emoji: '🏸' },
+            { id: 'boks', name: 'Sztuki walki', icon: 'fa-user-ninja', emoji: '🥊' }, { id: 'taniec', name: 'Taniec', icon: 'fa-music', emoji: '💃' },
+            { id: 'szachy', name: 'Szachy', icon: 'fa-chess', emoji: '♟️' }, { id: 'narty', name: 'Narciarstwo', icon: 'fa-skiing', emoji: '⛷️' },
+            { id: 'snowboard', name: 'Snowboard', icon: 'fa-snowboarding', emoji: '🏂' }, { id: 'golf', name: 'Golf', icon: 'fa-golf-ball', emoji: '⛳' },
+            { id: 'kalistenika', name: 'Kalistenika', icon: 'fa-child', emoji: '🤸' }, { id: 'crossfit', name: 'CrossFit', icon: 'fa-dumbbell', emoji: '🏋️‍♂️' },
+            { id: 'mma', name: 'MMA', icon: 'fa-fist-raised', emoji: '🤼' }, { id: 'bjj', name: 'BJJ', icon: 'fa-user-ninja', emoji: '🥋' },
+            { id: 'trekking', name: 'Trekking', icon: 'fa-hiking', emoji: '🥾' }, { id: 'nordic', name: 'Nordic Walking', icon: 'fa-walking', emoji: '🦯' },
+            { id: 'rowerszosowy', name: 'Rower szosowy', icon: 'fa-biking', emoji: '🚴‍♂️' }, { id: 'mtb', name: 'Rower MTB', icon: 'fa-mountain', emoji: '🚵' },
+            { id: 'bieginor', name: 'Biegi na orientację', icon: 'fa-map-signs', emoji: '🧭' }, { id: 'triathlon', name: 'Triathlon', icon: 'fa-swimmer', emoji: '🏊‍♂️' },
+            { id: 'kajaki', name: 'Kajakarstwo', icon: 'fa-water', emoji: '🛶' }, { id: 'sup', name: 'SUP', icon: 'fa-water', emoji: '🏄‍♂️' },
+            { id: 'windsurfing', name: 'Windsurfing', icon: 'fa-wind', emoji: '🌬️' }, { id: 'kitesurfing', name: 'Kitesurfing', icon: 'fa-kite', emoji: '🪁' },
+            { id: 'zeglarstwo', name: 'Żeglarstwo', icon: 'fa-ship', emoji: '⛵' }, { id: 'nurkowanie', name: 'Nurkowanie', icon: 'fa-water', emoji: '🤿' },
+            { id: 'lyzwy', name: 'Łyżwiarstwo figurowe', icon: 'fa-ice-skate', emoji: '⛸️' }, { id: 'hokej', name: 'Hokej', icon: 'fa-hockey-puck', emoji: '🏒' },
+            { id: 'curling', name: 'Curling', icon: 'fa-bullseye', emoji: '🥌' }, { id: 'rugby', name: 'Rugby', icon: 'fa-football-ball', emoji: '🏉' },
+            { id: 'futbolamer', name: 'Futbol ameryk.', icon: 'fa-football-ball', emoji: '🏈' }, { id: 'baseball', name: 'Baseball', icon: 'fa-baseball-ball', emoji: '⚾' },
+            { id: 'krykiet', name: 'Krykiet', icon: 'fa-cricket', emoji: '🏏' }, { id: 'bilard', name: 'Bilard/Snooker', icon: 'fa-circle', emoji: '🎱' },
+            { id: 'kregle', name: 'Kręgle', icon: 'fa-bowling-ball', emoji: '🎳' }, { id: 'lotki', name: 'Rzutki (Darts)', icon: 'fa-bullseye', emoji: '🎯' },
+            { id: 'lucznictwo', name: 'Łucznictwo', icon: 'fa-bullseye', emoji: '🏹' }, { id: 'strzelectwo', name: 'Strzelectwo', icon: 'fa-crosshairs', emoji: '🔫' },
+            { id: 'jezdziectwo', name: 'Jeździectwo', icon: 'fa-horse', emoji: '🏇' }, { id: 'szermierka', name: 'Szermierka', icon: 'fa-khanda', emoji: '🤺' },
+            { id: 'gimnastyka', name: 'Gimnastyka', icon: 'fa-child', emoji: '🤸‍♀️' }, { id: 'akrobatyka', name: 'Akrobatyka', icon: 'fa-child', emoji: '🤸‍♂️' },
+            { id: 'zumba', name: 'Zumba', icon: 'fa-users', emoji: '👯' }, { id: 'pole', name: 'Pole Dance', icon: 'fa-user', emoji: '💃' },
+            { id: 'aerial', name: 'Aerial Hoop', icon: 'fa-ring', emoji: '⭕' }, { id: 'padel', name: 'Padel', icon: 'fa-table-tennis', emoji: '🏓' },
+            { id: 'esport', name: 'E-sport', icon: 'fa-gamepad', emoji: '🎮' }, { id: 'wedkarstwo', name: 'Wędkarstwo', icon: 'fa-fish', emoji: '🎣' },
+            { id: 'skokinarciarskie', name: 'Skoki narciarskie', icon: 'fa-skiing', emoji: '⛷️' }, { id: 'hokejnatrawie', name: 'Hokej na trawie', icon: 'fa-hockey-puck', emoji: '🏑' },
+            { id: 'kolarstwotorowe', name: 'Kolarstwo torowe', icon: 'fa-bicycle', emoji: '🚴' }, { id: 'surfing', name: 'Surfing', icon: 'fa-water', emoji: '🏄' },
+            { id: 'karting', name: 'Karting', icon: 'fa-car', emoji: '🏎️' }, { id: 'parkour', name: 'Parkour', icon: 'fa-shoe-prints', emoji: '🏃' },
+            { id: 'alpinizm', name: 'Alpinizm', icon: 'fa-mountain', emoji: '🧗‍♂️' }, { id: 'bouldering', name: 'Bouldering', icon: 'fa-mountain', emoji: '🧗‍♀️' },
+            { id: 'trojboj', name: 'Trójbój siłowy', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'judo', name: 'Judo', icon: 'fa-user-ninja', emoji: '🥋' },
+            { id: 'karate', name: 'Karate', icon: 'fa-user-ninja', emoji: '🥋' }, { id: 'taekwondo', name: 'Taekwondo', icon: 'fa-user-ninja', emoji: '🥋' }
+        ];
+
+        let selectedSport = 'bieganie';
+        let topSports = ['bieganie', 'tenis', 'silownia', 'rower'];
 
         window.addEventListener('load', () => {
             renderNewPostSports();
@@ -976,7 +970,7 @@
                 if (filterSportSel) filterSportSel.innerHTML += `<option value="${s.id}">${s.emoji} ${s.name}</option>`; 
             });
             
-            renderSportGrid(); renderPosts(); renderProfileInterests();
+            renderSportGrid(); renderProfileInterests();
             
             setTimeout(() => {
                 const splash = document.getElementById('splashScreen');
@@ -1001,51 +995,16 @@
             document.getElementById('loginError').classList.add('hidden'); document.getElementById('regError').classList.add('hidden');
         }
 
-        function simulateLogin(provider) {
-            if (provider === 'email') {
-                if(!document.getElementById('loginEmailInput').value.trim() || !document.getElementById('loginPassInput').value.trim()) { 
-                    document.getElementById('loginError').innerText = i18n[currentLang].fillDataErr;
-                    document.getElementById('loginError').classList.remove('hidden'); 
-                    return; 
-                }
-                document.getElementById('loginError').classList.add('hidden');
-            } else if (provider === 'create') {
-                const emailVal = document.getElementById('regEmailInput').value.trim();
-                if(!document.getElementById('regLoginInput').value.trim() || !emailVal || !document.getElementById('regPassInput').value.trim()) { 
-                    document.getElementById('regError').innerText = i18n[currentLang].fillDataErr;
-                    document.getElementById('regError').classList.remove('hidden'); 
-                    return; 
-                }
-                if(!emailVal.includes('@')) {
-                    document.getElementById('regError').innerText = currentLang === 'pl' ? "Podaj poprawny adres e-mail (zawierający @)!" : "Enter a valid email address (with @)!";
-                    document.getElementById('regError').classList.remove('hidden'); 
-                    return;
-                }
-                document.getElementById('regError').classList.add('hidden');
-                
-                const loginScreen = document.getElementById('loginScreen');
-                loginScreen.classList.add('screen-exit-active');
-                setTimeout(() => {
-                    loginScreen.classList.add('hidden'); loginScreen.classList.remove('screen-exit-active');
-                    const confScreen = document.getElementById('emailConfirmModal');
-                    confScreen.classList.remove('hidden'); confScreen.classList.add('screen-enter-active', 'flex');
-                    setTimeout(() => { confScreen.classList.remove('screen-enter-active'); }, 500);
-                }, 400);
-                return; 
-            }
-            proceedToApp();
-        }
-
         function closeEmailConfirmAndContinue() {
             const confScreen = document.getElementById('emailConfirmModal');
             confScreen.classList.add('screen-exit-active');
             setTimeout(() => {
                 confScreen.classList.add('hidden'); confScreen.classList.remove('flex', 'screen-exit-active');
-                proceedToApp();
+                window.proceedToApp();
             }, 400);
         }
 
-        function proceedToApp() {
+        window.proceedToApp = () => {
             const loader = document.getElementById('loadingScreen'); loader.classList.remove('hidden');
             setTimeout(() => {
                 loader.classList.add('hidden');
@@ -1060,9 +1019,9 @@
                     showOnboarding();
                 }
             }, 1500); 
-        }
+        };
 
-        function performLogout() {
+        window.performLogout = () => {
             closeSettings(); 
             const appCont = document.getElementById('appContainer'); appCont.classList.add('screen-exit-active');
             setTimeout(() => {
@@ -1084,7 +1043,7 @@
                 document.getElementById('regPassInput').value = '';
                 setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
             }, 400);
-        }
+        };
 
         // 3. ONBOARDING
         function showOnboarding() {
@@ -1128,7 +1087,7 @@
             toggleOnbSportDropdown(hasVisible && val.length > 0);
         }
 
-        // Zamknięcie dropdowna po kliknięciu poza niego (obsługa ogólna dla onb i postów)
+        // Zamknięcie dropdowna po kliknięciu poza niego
         document.addEventListener('click', (e) => {
             const onbDropdown = document.getElementById('onbSportDropdown');
             const onbInput = document.getElementById('onbSport');
@@ -1136,9 +1095,9 @@
                 toggleOnbSportDropdown(false);
             }
         });
-        // --- Koniec autouzupełniania ---
 
-        function finishOnboarding() {
+        // Właściwy zapis do bazy z onboarding
+        window.finishOnboarding = async () => {
             const name = document.getElementById('onbName').value.trim();
             const age = document.getElementById('onbAge').value.trim();
             const city = document.getElementById('onbCity').value.trim();
@@ -1156,16 +1115,28 @@
             document.getElementById('newPostCity').value = city;
 
             const selectedOnbSport = document.getElementById('onbSport').value.trim();
+            let finalSport = null;
             if(selectedOnbSport) {
                 const matched = allSports.find(s => s.name.toLowerCase() === selectedOnbSport.toLowerCase() || s.id === selectedOnbSport.toLowerCase());
-                if (matched) {
-                    userInterests = [matched.id];
-                } else {
-                    const customId = 'custom_' + Date.now();
-                    allSports.push({id: customId, name: selectedOnbSport, icon: 'fa-star', emoji: '⭐'});
-                    userInterests = [customId];
+                if (matched) { finalSport = matched.id; } 
+                else {
+                    finalSport = 'custom_' + Date.now();
+                    allSports.push({id: finalSport, name: selectedOnbSport, icon: 'fa-star', emoji: '⭐'});
                 }
+                userInterests = [finalSport];
                 renderProfileInterests();
+            }
+
+            // FIREBASE: Zapis do chmury!
+            const user = window.auth.currentUser;
+            if(user) {
+                try {
+                    await window.firestore.setDoc(window.firestore.doc(window.db, "users", user.uid), {
+                        name: name, age: age, city: city, sport: finalSport || 'bieganie',
+                        bio: "Brak opisu.", interests: userInterests,
+                        photo: "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"
+                    });
+                } catch(e) { console.error("Error saving profile:", e); }
             }
 
             const onbScreen = document.getElementById('onboardingScreen'); onbScreen.classList.add('screen-exit-active');
@@ -1173,7 +1144,10 @@
                 onbScreen.classList.add('hidden'); onbScreen.classList.remove('screen-exit-active');
                 const appCont = document.getElementById('appContainer'); appCont.classList.remove('hidden'); appCont.classList.add('screen-enter-active');
                 document.getElementById('preferencesScreen').classList.remove('hidden');
-                setTimeout(() => { appCont.classList.remove('screen-enter-active'); renderPosts(); }, 500);
+                setTimeout(() => { 
+                    appCont.classList.remove('screen-enter-active'); 
+                    loadPostsFromDB(); // Od razu pobierz tablice!
+                }, 500);
             }, 400);
         }
 
@@ -1206,12 +1180,11 @@
 
         let isPro = false;
         
-        // Symulacja powrotu ze Stripe'a (w normalnej apce to robi backend przez webhook)
         function simulateStripeSuccess() {
             setTimeout(() => {
                 upgradeToPlan('PRO');
                 alert("Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!");
-            }, 2000); // Udaje opóźnienie weryfikacji
+            }, 2000); 
         }
 
         function upgradeToPlan(planType) {
@@ -1222,48 +1195,6 @@
         }
 
         function previewImage(event) { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { document.getElementById('profileImage').src = e.target.result; document.getElementById('yourMatchImg').src = e.target.result; }; reader.readAsDataURL(event.target.files[0]); } }
-
-        // 5. BAZA SPORTÓW
-        const allSports = [
-            { id: 'bieganie', name: 'Bieganie', icon: 'fa-shoe-prints', emoji: '🏃' }, { id: 'tenis', name: 'Tenis', icon: 'fa-table-tennis', emoji: '🎾' },
-            { id: 'silownia', name: 'Siłownia', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'rower', name: 'Rower', icon: 'fa-bicycle', emoji: '🚴' },
-            { id: 'koszykowka', name: 'Koszykówka', icon: 'fa-basketball-ball', emoji: '🏀' }, { id: 'siatkowka', name: 'Siatkówka', icon: 'fa-volleyball-ball', emoji: '🏐' },
-            { id: 'plywanie', name: 'Pływanie', icon: 'fa-swimmer', emoji: '🏊' }, { id: 'squash', name: 'Squash', icon: 'fa-stopwatch', emoji: '🏸' },
-            { id: 'pilkanozna', name: 'Piłka nożna', icon: 'fa-futbol', emoji: '⚽' }, { id: 'joga', name: 'Joga/Pilates', icon: 'fa-om', emoji: '🧘' },
-            { id: 'wspinaczka', name: 'Wspinaczka', icon: 'fa-mountain', emoji: '🧗' }, { id: 'rolki', name: 'Rolki', icon: 'fa-skating', emoji: '🛼' },
-            { id: 'pingpong', name: 'Tenis stołowy', icon: 'fa-table-tennis', emoji: '🏓' }, { id: 'badminton', name: 'Badminton', icon: 'fa-feather', emoji: '🏸' },
-            { id: 'boks', name: 'Sztuki walki', icon: 'fa-user-ninja', emoji: '🥊' }, { id: 'taniec', name: 'Taniec', icon: 'fa-music', emoji: '💃' },
-            { id: 'szachy', name: 'Szachy', icon: 'fa-chess', emoji: '♟️' }, { id: 'narty', name: 'Narciarstwo', icon: 'fa-skiing', emoji: '⛷️' },
-            { id: 'snowboard', name: 'Snowboard', icon: 'fa-snowboarding', emoji: '🏂' }, { id: 'golf', name: 'Golf', icon: 'fa-golf-ball', emoji: '⛳' },
-            { id: 'kalistenika', name: 'Kalistenika', icon: 'fa-child', emoji: '🤸' }, { id: 'crossfit', name: 'CrossFit', icon: 'fa-dumbbell', emoji: '🏋️‍♂️' },
-            { id: 'mma', name: 'MMA', icon: 'fa-fist-raised', emoji: '🤼' }, { id: 'bjj', name: 'BJJ', icon: 'fa-user-ninja', emoji: '🥋' },
-            { id: 'trekking', name: 'Trekking', icon: 'fa-hiking', emoji: '🥾' }, { id: 'nordic', name: 'Nordic Walking', icon: 'fa-walking', emoji: '🦯' },
-            { id: 'rowerszosowy', name: 'Rower szosowy', icon: 'fa-biking', emoji: '🚴‍♂️' }, { id: 'mtb', name: 'Rower MTB', icon: 'fa-mountain', emoji: '🚵' },
-            { id: 'bieginor', name: 'Biegi na orientację', icon: 'fa-map-signs', emoji: '🧭' }, { id: 'triathlon', name: 'Triathlon', icon: 'fa-swimmer', emoji: '🏊‍♂️' },
-            { id: 'kajaki', name: 'Kajakarstwo', icon: 'fa-water', emoji: '🛶' }, { id: 'sup', name: 'SUP', icon: 'fa-water', emoji: '🏄‍♂️' },
-            { id: 'windsurfing', name: 'Windsurfing', icon: 'fa-wind', emoji: '🌬️' }, { id: 'kitesurfing', name: 'Kitesurfing', icon: 'fa-kite', emoji: '🪁' },
-            { id: 'zeglarstwo', name: 'Żeglarstwo', icon: 'fa-ship', emoji: '⛵' }, { id: 'nurkowanie', name: 'Nurkowanie', icon: 'fa-water', emoji: '🤿' },
-            { id: 'lyzwy', name: 'Łyżwiarstwo figurowe', icon: 'fa-ice-skate', emoji: '⛸️' }, { id: 'hokej', name: 'Hokej', icon: 'fa-hockey-puck', emoji: '🏒' },
-            { id: 'curling', name: 'Curling', icon: 'fa-bullseye', emoji: '🥌' }, { id: 'rugby', name: 'Rugby', icon: 'fa-football-ball', emoji: '🏉' },
-            { id: 'futbolamer', name: 'Futbol ameryk.', icon: 'fa-football-ball', emoji: '🏈' }, { id: 'baseball', name: 'Baseball', icon: 'fa-baseball-ball', emoji: '⚾' },
-            { id: 'krykiet', name: 'Krykiet', icon: 'fa-cricket', emoji: '🏏' }, { id: 'bilard', name: 'Bilard/Snooker', icon: 'fa-circle', emoji: '🎱' },
-            { id: 'kregle', name: 'Kręgle', icon: 'fa-bowling-ball', emoji: '🎳' }, { id: 'lotki', name: 'Rzutki (Darts)', icon: 'fa-bullseye', emoji: '🎯' },
-            { id: 'lucznictwo', name: 'Łucznictwo', icon: 'fa-bullseye', emoji: '🏹' }, { id: 'strzelectwo', name: 'Strzelectwo', icon: 'fa-crosshairs', emoji: '🔫' },
-            { id: 'jezdziectwo', name: 'Jeździectwo', icon: 'fa-horse', emoji: '🏇' }, { id: 'szermierka', name: 'Szermierka', icon: 'fa-khanda', emoji: '🤺' },
-            { id: 'gimnastyka', name: 'Gimnastyka', icon: 'fa-child', emoji: '🤸‍♀️' }, { id: 'akrobatyka', name: 'Akrobatyka', icon: 'fa-child', emoji: '🤸‍♂️' },
-            { id: 'zumba', name: 'Zumba', icon: 'fa-users', emoji: '👯' }, { id: 'pole', name: 'Pole Dance', icon: 'fa-user', emoji: '💃' },
-            { id: 'aerial', name: 'Aerial Hoop', icon: 'fa-ring', emoji: '⭕' }, { id: 'padel', name: 'Padel', icon: 'fa-table-tennis', emoji: '🏓' },
-            { id: 'esport', name: 'E-sport', icon: 'fa-gamepad', emoji: '🎮' }, { id: 'wedkarstwo', name: 'Wędkarstwo', icon: 'fa-fish', emoji: '🎣' },
-            { id: 'skokinarciarskie', name: 'Skoki narciarskie', icon: 'fa-skiing', emoji: '⛷️' }, { id: 'hokejnatrawie', name: 'Hokej na trawie', icon: 'fa-hockey-puck', emoji: '🏑' },
-            { id: 'kolarstwotorowe', name: 'Kolarstwo torowe', icon: 'fa-bicycle', emoji: '🚴' }, { id: 'surfing', name: 'Surfing', icon: 'fa-water', emoji: '🏄' },
-            { id: 'karting', name: 'Karting', icon: 'fa-car', emoji: '🏎️' }, { id: 'parkour', name: 'Parkour', icon: 'fa-shoe-prints', emoji: '🏃' },
-            { id: 'alpinizm', name: 'Alpinizm', icon: 'fa-mountain', emoji: '🧗‍♂️' }, { id: 'bouldering', name: 'Bouldering', icon: 'fa-mountain', emoji: '🧗‍♀️' },
-            { id: 'trojboj', name: 'Trójbój siłowy', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'judo', name: 'Judo', icon: 'fa-user-ninja', emoji: '🥋' },
-            { id: 'karate', name: 'Karate', icon: 'fa-user-ninja', emoji: '🥋' }, { id: 'taekwondo', name: 'Taekwondo', icon: 'fa-user-ninja', emoji: '🥋' }
-        ];
-
-        let selectedSport = 'bieganie';
-        let topSports = ['bieganie', 'tenis', 'silownia', 'rower'];
 
         function renderSportGrid() {
             const grid = document.getElementById('sportGrid'); grid.innerHTML = '';
@@ -1354,7 +1285,7 @@
         const i18n = {
             pl: {
                 appTitle: "Zacznij trening!", appSubtitle: "Wybierz miasto i sport, aby znaleźć partnerów.", locationLbl: "Lokalizacja", disciplineLbl: "Dyscyplina",
-                btnSearch: "Szukaj partnerów", noProfTitle: "Brak profili", noProfDesc: "Rozszerz kryteria wyszukiwania.", btnChangeSet: "Zmień ustawienia",
+                btnSearch: "Szukaj partnerów", noProfTitle: "Brak profili", noProfDesc: "Zmień filtry, by poszukać ponownie.", btnChangeSet: "Zmień ustawienia",
                 matchNew: "Nowe Pary", matchMsg: "Wiadomości", botNow: "Teraz", botPreview: "Gotowy na dzisiejszy trening?", botIntro: "Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪",
                 chatAlways: "Zawsze aktywny", chatToday: "Dziś", profTitle: "Twój Profil", profPrem: "Konto Premium Aktywne", profFree: "Plan Darmowy", profName: "Imię, Wiek i Miasto", profBio: "Moje bio", profInt: "Zainteresowania Sportowe",
                 setMain: "Ustawienia", setPref: "Preferencje", setLang: "Język aplikacji", setPush: "Powiadomienia Push", setDark: "Tryb Ciemny",
@@ -1370,7 +1301,7 @@
             },
             en: {
                 appTitle: "Start training!", appSubtitle: "Choose city and sport to find partners.", locationLbl: "Location", disciplineLbl: "Discipline",
-                btnSearch: "Find partners", noProfTitle: "No profiles", noProfDesc: "Expand your search criteria.", btnChangeSet: "Change settings",
+                btnSearch: "Find partners", noProfTitle: "No profiles", noProfDesc: "Change filters to search again.", btnChangeSet: "Change settings",
                 matchNew: "New Matches", matchMsg: "Messages", botNow: "Now", botPreview: "Ready for today's training?", botIntro: "Hi! I'm your virtual assistant. Planning any sports today? 💪",
                 chatAlways: "Always active", chatToday: "Today", profTitle: "Your Profile", profPrem: "Premium Account Active", profFree: "Free Plan", profName: "Name, Age & City", profBio: "My bio", profInt: "Sports Interests",
                 setMain: "Settings", setPref: "Preferences", setLang: "App Language", setPush: "Push Notifications", setDark: "Dark Mode",
@@ -1410,15 +1341,21 @@
             }
         }
 
-        // 8. TABLICA POSTÓW I DODAWANIE
-        let postsDB = [
-            { id: 1, author: 'Kuba', avatar: 'https://i.pravatar.cc/150?img=11', time: '10 min temu', content: 'Szukamy bramkarza na orlika dzisiaj o 20:00! Hala Orbita.', sport: 'pilkanozna', city: 'Wrocław' },
-            { id: 2, author: 'Zosia', avatar: 'https://i.pravatar.cc/150?img=9', time: '1 godz. temu', content: 'Idę wieczorem pobiegać po parku, ktoś dołączy? Tempo ok. 5:30/km.', sport: 'bieganie', city: 'Wrocław' },
-            { id: 3, author: 'Kasia', avatar: 'https://i.pravatar.cc/150?img=20', time: '5 min temu', content: 'Ktoś chętny zagrać w padla na weekendzie? Znam fajny kort.', sport: 'padel', city: 'Warszawa' }
-        ];
-
+        // 8. TABLICA POSTÓW I DODAWANIE Z BAZY
+        let postsDB = []; // Puste! Ładowane z Firestore
         let pendingPostMedia = null;
         let pendingPostMediaType = null;
+
+        async function loadPostsFromDB() {
+            postsDB = [];
+            try {
+                const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, "posts"));
+                querySnapshot.forEach((doc) => {
+                    postsDB.push({ id: doc.id, ...doc.data() });
+                });
+                renderPosts();
+            } catch(e) { console.error("Error loading posts:", e); }
+        }
 
         function renderPosts() {
             const container = document.getElementById('postsContainer'); container.innerHTML = '';
@@ -1515,7 +1452,7 @@
         
         function closeAddPostModal() { const m = document.getElementById('addPostModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
         
-        function submitNewPost() {
+        async function submitNewPost() {
             const content = document.getElementById('newPostContent').value.trim();
             const sport = document.getElementById('newPostSportValue').value;
             const city = document.getElementById('newPostCity').value;
@@ -1523,21 +1460,19 @@
             
             if(!content || !sport || !city) { errEl.classList.remove('hidden'); return; }
             
-            postsDB.push({ id: Date.now(), author: document.getElementById('inputName').value || 'Ty', avatar: document.getElementById('profileImage').src, time: 'Teraz', content: content, sport: sport, city: city, media: pendingPostMedia, mediaType: pendingPostMediaType });
+            const newPostData = { author: document.getElementById('inputName').value || 'Ty', avatar: document.getElementById('profileImage').src, time: 'Teraz', content: content, sport: sport, city: city, media: pendingPostMedia, mediaType: pendingPostMediaType };
+            try {
+                const docRef = await window.firestore.addDoc(window.firestore.collection(window.db, "posts"), newPostData);
+                postsDB.push({ id: docRef.id, ...newPostData });
+            } catch(e) { console.error("Błąd zapisywania", e); }
             
             document.getElementById('postCityFilter').value = city; document.getElementById('postSportFilter').value = 'all';
             renderPosts(); closeAddPostModal();
         }
 
-        // 9. SWIPE I MATCH
+        // 9. SWIPE I MATCH (Prawdziwe dane z bazy!)
         let currentCards = []; let matches = []; let activeChatFilters = new Set();
-        const profilesDB = [
-            { id: 1, name: 'Michał', age: 28, city: 'Wrocław', sport: 'bieganie', level: 'Średnio', bio: 'Biegam nad Odrą. Szukam kogoś na tempo 5:30/km.', img: 'https://i.pravatar.cc/400?img=12' },
-            { id: 2, name: 'Ania', age: 25, city: 'Wrocław', sport: 'bieganie', level: 'Początkujący', bio: 'Dopiero zaczynam, przygotowuję się do pierwszych 5km.', img: 'https://i.pravatar.cc/400?img=5' },
-            { id: 4, name: 'Kasia', age: 29, city: 'Wrocław', sport: 'tenis', level: 'Średnio', bio: 'Zazwyczaj gram w Hasta La Vista.', img: 'https://i.pravatar.cc/400?img=20' },
-            { id: 5, name: 'Piotrek', age: 24, city: 'Kraków', sport: 'silownia', level: 'Zaawansowany', bio: 'Szukam kogoś do asekuracji przy ciężkich siadach.', img: 'https://i.pravatar.cc/400?img=11' }
-        ];
-
+        
         const screensApp = ['preferencesScreen', 'swipeScreen', 'messagesScreen', 'profileScreen', 'postsScreen'];
         function navTo(screenId, btnElement = null) {
             screensApp.forEach(s => { const el = document.getElementById(s); if(el) { el.classList.add('hidden'); el.classList.remove('fade-in'); } });
@@ -1553,14 +1488,31 @@
             navTo('swipeScreen'); startMatching(); 
         });
 
-        function startMatching() {
+        async function startMatching() {
             const cityName = document.getElementById('citySelect').options[document.getElementById('citySelect').selectedIndex].text;
             const sportObj = allSports.find(s=>s.id === selectedSport);
             document.getElementById('currentFilterText').innerHTML = `<i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>${cityName} • ${sportObj.emoji} ${sportObj.name}</span>`;
             
-            let filtered = profilesDB.filter(p => p.city.toLowerCase() === cityName.toLowerCase() && p.sport === selectedSport);
-            currentCards = [...filtered].sort(() => Math.random() - 0.5);
-            renderCards();
+            try {
+                const q = window.firestore.query(
+                    window.firestore.collection(window.db, "users"), 
+                    window.firestore.where("city", "==", selectedCity),
+                    window.firestore.where("sport", "==", selectedSport)
+                );
+                const querySnapshot = await window.firestore.getDocs(q);
+                let filtered = [];
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if(window.auth.currentUser && doc.id === window.auth.currentUser.uid) return; // Nie pokazuj siebie
+                    filtered.push({ id: doc.id, name: data.name, age: data.age, city: data.city, sport: data.sport, level: 'Początkujący', bio: data.bio, img: data.photo });
+                });
+                currentCards = filtered.sort(() => Math.random() - 0.5);
+                renderCards();
+            } catch(e) {
+                console.error("Błąd pobierania profili", e);
+                currentCards = [];
+                renderCards();
+            }
         }
 
         function renderCards() {
@@ -1610,7 +1562,7 @@
         // 11. CZAT, BOT I MIEJSCÓWKI
         const chatScreen = document.getElementById('chatScreen'); const messagesContainer = document.getElementById('chatMessages'); const inputField = document.getElementById('chatInput');
         const defaultBotAvatar = 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff';
-        const apiKey = ""; 
+        const apiKey = "AQ.Ab8RN6LB_FXTaFt7teQR6yNr--7zU3MshtYS7k3G0uYf8pl92w"; 
 
         let allChatHistories = {
             'bot': { name: 'Trener Bot', img: defaultBotAvatar, messages: [{ role: 'model', parts: [{text: 'Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪'}]}] }
@@ -1776,7 +1728,7 @@ Poza tym krótko motywuj do treningu.`;
                     document.getElementById('typingIndicator')?.remove(); 
                     let reply = "";
                     if(currentChatId === 'bot') {
-                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga API by działać pełniej)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
+                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie!" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
                     } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi!`; }
                     appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
                     allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: reply }] }); 
@@ -1787,7 +1739,12 @@ Poza tym krótko motywuj do treningu.`;
                 document.getElementById('typingIndicator')?.remove();
                 const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd sieci.";
                 appendMessageUI(botReply, false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
-            } catch (error) { document.getElementById('typingIndicator')?.remove(); appendMessageUI("Błąd serwera.", false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.pop(); }
+            } catch (error) { 
+                document.getElementById('typingIndicator')?.remove(); 
+                // Zabezpieczenie przed niewłaściwym kluczem API.
+                appendMessageUI("Błąd połączenia. Upewnij się, że wpisany klucz API jest prawidłowym kluczem Gemini, a nie np. tokenem uwierzytelniającym OAuth.", false, allChatHistories[currentChatId].img); 
+                allChatHistories[currentChatId].messages.pop(); 
+            }
         }
 
         async function sendMessage() {
