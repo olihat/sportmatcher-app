@@ -1078,6 +1078,13 @@
             } catch(e) {
                 console.error("Błąd ładowania danych profilu:", e);
                 loader.classList.add('hidden');
+                
+                // Bezpiecznik: Upewniamy się, że ekran logowania zniknie nawet przy błędzie neta
+                const loginScreen = document.getElementById('loginScreen'); 
+                if(loginScreen && !loginScreen.classList.contains('hidden')) {
+                    loginScreen.classList.add('hidden'); 
+                }
+                
                 showOnboarding(); // W razie kłopotu profilaktycznie wyrzucamy na Onboarding
             }
         };
