@@ -50,13 +50,12 @@
       
         // TWOJE PRAWDZIWE KLUCZE Z FIREBASE!
         const firebaseConfig = {
-          apiKey: "AIzaSyAM6U506cQ3OqXQWqNFRTSRECRZdY0fNNE",
-          authDomain: "sport-matcher.firebaseapp.com",
-          projectId: "sport-matcher",
-          storageBucket: "sport-matcher.firebasestorage.app",
-          messagingSenderId: "896516657798",
-          appId: "1:896516657798:web:80745d98121b019dea3707",
-          measurementId: "G-1M2J6X36ZK"
+          apiKey: "TWOJ_API_KEY",
+          authDomain: "twoj-projekt.firebaseapp.com",
+          projectId: "twoj-projekt",
+          storageBucket: "twoj-projekt.appspot.com",
+          messagingSenderId: "123456789",
+          appId: "1:12345:web:abcd"
         };
       
         const app = initializeApp(firebaseConfig);
@@ -1004,21 +1003,77 @@
             }, 400);
         }
 
-        window.proceedToApp = () => {
-            const loader = document.getElementById('loadingScreen'); loader.classList.remove('hidden');
-            setTimeout(() => {
+        window.proceedToApp = async () => {
+            const loader = document.getElementById('loadingScreen'); 
+            loader.classList.remove('hidden');
+
+            const user = window.auth ? window.auth.currentUser : null;
+            if(!user) {
+                loader.classList.add('hidden');
+                return;
+            }
+
+            try {
+                // Sprawdzamy, czy ten użytkownik zakładał już kiedyś u nas profil (w bazie)
+                const userDocRef = window.firestore.doc(window.db, "users", user.uid);
+                const userDocSnap = await window.firestore.getDoc(userDocRef);
+                
                 loader.classList.add('hidden');
                 const loginScreen = document.getElementById('loginScreen'); 
-                if(!loginScreen.classList.contains('hidden')) {
+                
+                if(loginScreen && !loginScreen.classList.contains('hidden')) {
                     loginScreen.classList.add('screen-exit-active');
                     setTimeout(() => {
-                        loginScreen.classList.add('hidden'); loginScreen.classList.remove('screen-exit-active');
-                        showOnboarding();
+                        loginScreen.classList.add('hidden'); 
+                        loginScreen.classList.remove('screen-exit-active');
                     }, 400); 
+                }
+
+                if(userDocSnap.exists()) {
+                    // Profil istnieje - przywracamy dane i POMIJAMY Onboarding
+                    const data = userDocSnap.data();
+                    
+                    document.getElementById('displayName').innerText = data.name || "Gracz";
+                    document.getElementById('inputName').value = data.name || "";
+                    document.getElementById('displayAge').innerText = data.age || "";
+                    document.getElementById('inputAge').value = data.age || "";
+                    document.getElementById('displayCityText').innerText = data.city || "";
+                    document.getElementById('inputProfileCity').value = data.city || "";
+                    
+                    if(document.getElementById('postCityFilter')) document.getElementById('postCityFilter').value = data.city || "";
+                    if(document.getElementById('newPostCity')) document.getElementById('newPostCity').value = data.city || "";
+
+                    if(data.bio) {
+                        document.getElementById('displayBio').innerText = data.bio;
+                        document.getElementById('inputBio').value = data.bio;
+                        document.getElementById('displayBio').classList.remove('italic', 'text-gray-400');
+                    }
+
+                    if(data.interests && Array.isArray(data.interests)) {
+                        userInterests = data.interests;
+                        if(typeof renderProfileInterests === 'function') renderProfileInterests();
+                    }
+
+                    // Wchodzimy od razu w głąb aplikacji
+                    const appCont = document.getElementById('appContainer'); 
+                    appCont.classList.remove('hidden'); 
+                    appCont.classList.add('screen-enter-active');
+                    document.getElementById('preferencesScreen').classList.remove('hidden');
+                    
+                    setTimeout(() => { 
+                        appCont.classList.remove('screen-enter-active'); 
+                        if(typeof loadPostsFromDB === 'function') loadPostsFromDB();
+                    }, 500);
+
                 } else {
+                    // Profilu jeszcze nie ma (Nowy uzytkownik) - kierujemy go na ekran podawania danych
                     showOnboarding();
                 }
-            }, 1500); 
+            } catch(e) {
+                console.error("Błąd ładowania danych profilu:", e);
+                loader.classList.add('hidden');
+                showOnboarding(); // W razie kłopotu profilaktycznie wyrzucamy na Onboarding
+            }
         };
 
         window.performLogout = () => {
@@ -1183,7 +1238,9 @@
         function simulateStripeSuccess() {
             setTimeout(() => {
                 upgradeToPlan('PRO');
-                alert("Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!");
+                if(typeof window.showMessage === 'function') {
+                    window.showMessage("Płatność udana", "Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!");
+                }
             }, 2000); 
         }
 
@@ -1297,7 +1354,7 @@
                 phEmailLogin: "Adres e-mail lub login", phCity: "Twoje miasto", filterAll: "Wszystkie", chatAttachPhoto: "Wyślij zdjęcie", chatSuggestVenue: "Zaproponuj miejscówkę", venuesTitle: "Wybierz miejscówkę",
                 onbTitle: "Jeszcze tylko chwila!", onbSub: "Wypełnij podstawowe dane, abyśmy mogli znaleźć Ci partnerów.", phName: "Twoje Imię", phAge: "Twój Wiek (Min. 18 lat)", onbStart: "Zaczynamy!",
                 onbSportOpt: "Ulubiony sport (Opcjonalnie)", addPostTitle: "Nowe ogłoszenie", addPostBtn: "Opublikuj",
-                emailConfTitle: "Potwierdź e-mail", emailConfDesc: "Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą!", btnUnderstand: "Rozumiem"
+                emailConfTitle: "Potwierdź e-mail", emailConfDesc: "Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!", btnUnderstand: "Rozumiem"
             },
             en: {
                 appTitle: "Start training!", appSubtitle: "Choose city and sport to find partners.", locationLbl: "Location", disciplineLbl: "Discipline",
@@ -1576,7 +1633,7 @@
             const slider = document.getElementById('matchesList');
             const circle = document.createElement('div'); circle.className = 'flex flex-col items-center cursor-pointer fade-in';
             circle.onclick = () => openChat(profile.id, profile.name, profile.img);
-            circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${profile.img}" class="w-full h-full rounded-full object-cover bg-white"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300">${profile.name}</span>`;
+            circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${profile.img}" class="w-full h-full rounded-full object-cover"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300">${profile.name}</span>`;
             slider.appendChild(circle);
 
             const chatList = document.getElementById('chatsList');
@@ -1728,7 +1785,7 @@ Poza tym krótko motywuj do treningu.`;
                     document.getElementById('typingIndicator')?.remove(); 
                     let reply = "";
                     if(currentChatId === 'bot') {
-                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie!" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
+                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga API by działać pełniej)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
                     } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi!`; }
                     appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
                     allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: reply }] }); 
@@ -1739,12 +1796,7 @@ Poza tym krótko motywuj do treningu.`;
                 document.getElementById('typingIndicator')?.remove();
                 const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd sieci.";
                 appendMessageUI(botReply, false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
-            } catch (error) { 
-                document.getElementById('typingIndicator')?.remove(); 
-                // Zabezpieczenie przed niewłaściwym kluczem API.
-                appendMessageUI("Błąd połączenia. Upewnij się, że wpisany klucz API jest prawidłowym kluczem Gemini, a nie np. tokenem uwierzytelniającym OAuth.", false, allChatHistories[currentChatId].img); 
-                allChatHistories[currentChatId].messages.pop(); 
-            }
+            } catch (error) { document.getElementById('typingIndicator')?.remove(); appendMessageUI("Błąd serwera.", false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.pop(); }
         }
 
         async function sendMessage() {
