@@ -39,7 +39,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
-          getFirestore, doc, setDoc, collection, getDocs, addDoc, query, where, deleteDoc 
+          getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, query, where, deleteDoc 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { 
           getAuth, 
@@ -72,7 +72,7 @@
         // Udostępnienie instancji Firebase na zewnątrz do dolnego skryptu
         window.auth = auth;
         window.db = db;
-        window.firestore = { doc, setDoc, collection, getDocs, addDoc, query, where };
+        window.firestore = { doc, getDoc, setDoc, collection, getDocs, addDoc, query, where, deleteDoc };
       
         window.realEmailRegister = (btn) => {
           const email = document.getElementById('regEmailInput').value.trim();
