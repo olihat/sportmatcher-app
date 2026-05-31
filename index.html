@@ -34,7 +34,10 @@
           signInWithEmailAndPassword,
           sendEmailVerification,
           GoogleAuthProvider,
-          signInWithPopup
+          signInWithPopup,
+          deleteUser,
+          EmailAuthProvider,
+          reauthenticateWithCredential
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
       
         // TWOJE PRAWDZIWE KLUCZE Z FIREBASE!
@@ -52,7 +55,7 @@
         const auth = getAuth(app);
         const googleProvider = new GoogleAuthProvider();
       
-        window.realEmailRegister = () => {
+        window.realEmailRegister = (btn) => {
           const email = document.getElementById('regEmailInput').value.trim();
           const pass = document.getElementById('regPassInput').value.trim();
           const login = document.getElementById('regLoginInput').value.trim();
@@ -63,11 +66,17 @@
               errEl.classList.remove('hidden'); 
               return; 
           }
+          
+          const origText = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+          btn.disabled = true;
       
           createUserWithEmailAndPassword(auth, email, pass)
             .then((userCredential) => {
               sendEmailVerification(userCredential.user)
                 .then(() => {
+                  btn.innerHTML = origText;
+                  btn.disabled = false;
                   document.getElementById('loginScreen').classList.add('hidden');
                   const confScreen = document.getElementById('emailConfirmModal');
                   if(confScreen) {
@@ -77,12 +86,20 @@
                 });
             })
             .catch((error) => {
-              errEl.innerText = "Błąd rejestracji: " + error.message;
+              btn.innerHTML = origText;
+              btn.disabled = false;
+              if (error.code === 'auth/email-already-in-use') {
+                  errEl.innerText = "Ten e-mail jest już zajęty!";
+              } else if (error.code === 'auth/weak-password') {
+                  errEl.innerText = "Hasło jest za słabe (min. 6 znaków)!";
+              } else {
+                  errEl.innerText = "Błąd rejestracji: " + error.message;
+              }
               errEl.classList.remove('hidden');
             });
         };
       
-        window.realEmailLogin = () => {
+        window.realEmailLogin = (btn) => {
           const email = document.getElementById('loginEmailInput').value.trim();
           const pass = document.getElementById('loginPassInput').value.trim();
           const errEl = document.getElementById('loginError');
@@ -92,9 +109,15 @@
               errEl.classList.remove('hidden'); 
               return; 
           }
+          
+          const origText = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+          btn.disabled = true;
 
           signInWithEmailAndPassword(auth, email, pass)
             .then((userCredential) => {
+              btn.innerHTML = origText;
+              btn.disabled = false;
               if (!userCredential.user.emailVerified) {
                   errEl.innerText = "Najpierw potwierdź adres e-mail!";
                   errEl.classList.remove('hidden');
@@ -105,11 +128,17 @@
               }
             })
             .catch((error) => {
-              errEl.innerText = "Błędny e-mail lub hasło!";
+              btn.innerHTML = origText;
+              btn.disabled = false;
+              if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                  errEl.innerText = "Błędny e-mail lub hasło!";
+              } else {
+                  errEl.innerText = "Błąd: " + error.message;
+              }
               errEl.classList.remove('hidden');
             });
         };
-      
+
         window.realGoogleLogin = () => {
           signInWithPopup(auth, googleProvider)
             .then((result) => {
@@ -120,6 +149,67 @@
             .catch((error) => {
               alert("Błąd logowania Google: " + error.message);
             });
+        };
+
+        window.openDeleteAccountModal = () => {
+            const user = auth.currentUser;
+            if(!user) return;
+            
+            // Ukryj/pokaż pole na hasło w zależności od metody logowania
+            const passContainer = document.getElementById('deletePassContainer');
+            if (user.providerData.some(p => p.providerId === 'password')) {
+                passContainer.classList.remove('hidden');
+            } else {
+                passContainer.classList.add('hidden');
+            }
+
+            document.getElementById('deleteAccountModal').classList.remove('hidden');
+            document.getElementById('deleteAccountModal').classList.add('flex');
+            document.getElementById('deletePassInput').value = '';
+            document.getElementById('deleteError').classList.add('hidden');
+        };
+
+        window.closeDeleteAccountModal = () => {
+            document.getElementById('deleteAccountModal').classList.add('hidden');
+            document.getElementById('deleteAccountModal').classList.remove('flex');
+        };
+
+        window.confirmDeleteAccount = (btn) => {
+            const pass = document.getElementById('deletePassInput').value.trim();
+            const errEl = document.getElementById('deleteError');
+            const user = auth.currentUser;
+
+            if(!user) { errEl.innerText = "Błąd: Brak zalogowanego użytkownika."; errEl.classList.remove('hidden'); return; }
+            if(!pass && user.providerData.some(p => p.providerId === 'password')) { errEl.innerText = "Podaj hasło!"; errEl.classList.remove('hidden'); return; }
+
+            const origText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+            btn.disabled = true;
+
+            if(user.providerData.some(p => p.providerId === 'password')) {
+                const credential = EmailAuthProvider.credential(user.email, pass);
+                reauthenticateWithCredential(user, credential).then(() => {
+                    deleteUser(user).then(() => {
+                        alert("Konto zostało pomyślnie usunięte z bazy danych.");
+                        closeDeleteAccountModal();
+                        if(typeof window.performLogout === 'function') window.performLogout();
+                    }).catch(err => {
+                        errEl.innerText = "Błąd usuwania: " + err.message; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
+                    });
+                }).catch(err => {
+                    errEl.innerText = "Podano błędne hasło!"; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
+                });
+            } else {
+                deleteUser(user).then(() => {
+                    alert("Konto zostało usunięte.");
+                    closeDeleteAccountModal();
+                    if(typeof window.performLogout === 'function') window.performLogout();
+                }).catch(err => {
+                    if(err.code === 'auth/requires-recent-login') errEl.innerText = "Wyloguj i zaloguj się ponownie (Google), by móc usunąć konto.";
+                    else errEl.innerText = "Błąd: " + err.message;
+                    errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
+                });
+            }
         };
     </script>
     <style>
@@ -226,7 +316,7 @@
                             <button onclick="proceedToApp()" class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-apple text-xl mr-3 mb-1"></i><span class="font-semibold text-sm" data-i18n="logApple">Kontynuuj przez Apple</span>
                             </button>
-                            <button onclick="realGoogleLogin()" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button onclick="realGoogleLogin(this)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                 <span class="font-semibold text-sm" data-i18n="logGoogle">Kontynuuj przez Google</span>
                             </button>
@@ -252,7 +342,7 @@
                             </div>
                             <p id="loginError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
                             
-                            <button onclick="realEmailLogin()" class="w-full h-12 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center mt-2">
+                            <button onclick="realEmailLogin(this)" class="w-full h-12 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center mt-2">
                                 <span data-i18n="logBtn">Zaloguj się</span>
                             </button>
                         </div>
@@ -283,7 +373,7 @@
                             <p id="regError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
                         </div>
 
-                        <button onclick="realEmailRegister()" class="w-full h-12 bg-primary text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center">
+                        <button onclick="realEmailRegister(this)" class="w-full h-12 bg-primary text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center">
                             <span data-i18n="createBtn">Stwórz konto</span>
                         </button>
                         
@@ -302,7 +392,7 @@
                 <i class="fas fa-envelope-open-text text-5xl"></i>
             </div>
             <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
-            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą!</p>
+            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!</p>
             <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
                 Zrozumiałem
             </button>
@@ -762,6 +852,9 @@
                     <button onclick="performLogout()" class="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold py-4 rounded-xl border border-red-100 dark:border-red-900 transition mt-6 active:scale-95" data-i18n="setLogout">
                         Wyloguj się
                     </button>
+                    <button onclick="openDeleteAccountModal()" class="w-full bg-transparent text-gray-400 hover:text-red-500 font-bold py-3 text-sm transition mt-2 active:scale-95 underline">
+                        Usuń konto trwale
+                    </button>
                 </div>
             </div>
 
@@ -805,20 +898,6 @@
                 <div id="textModalContent" class="flex-1 overflow-y-auto p-6 text-gray-700 dark:text-gray-300 text-sm leading-relaxed space-y-4"></div>
             </div>
 
-            <!-- MODAL POTWIERDZENIA E-MAIL -->
-            <div id="emailConfirmModal" class="absolute inset-0 bg-slate-900/80 z-[9500] hidden flex-col items-center justify-center p-6 fade-in">
-                <div class="bg-white dark:bg-darkcard rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-                    <div class="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mx-auto mb-6">
-                        <i class="fas fa-envelope-open-text text-4xl"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
-                    <p class="text-gray-600 dark:text-gray-400 text-sm mb-8" data-i18n="emailConfDesc">Wysłaliśmy link aktywacyjny na Twój adres. Kliknij go, aby zweryfikować konto!</p>
-                    <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
-                        Rozumiem
-                    </button>
-                </div>
-            </div>
-
             <!-- MODAL MATCH (Złota Błyskawica) -->
             <div id="matchModal" class="absolute inset-0 bg-slate-900/95 z-[80] hidden flex-col items-center justify-center p-6 text-white fade-in">
                 <h2 class="text-5xl font-black mb-8 italic text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-500 drop-shadow-lg">MATCH!</h2>
@@ -831,6 +910,30 @@
                 <div class="w-full space-y-3 max-w-[300px]">
                     <button id="goChatBtn" class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-4 rounded-full shadow-lg" data-i18n="matchGoMsg">Przejdź do wiadomości</button>
                     <button onclick="closeMatchModal()" class="w-full border border-white/30 text-white font-semibold py-4 rounded-full hover:bg-white/10" data-i18n="matchPlay">Graj dalej</button>
+                </div>
+            </div>
+
+            <!-- MODAL USUWANIA KONTA -->
+            <div id="deleteAccountModal" class="absolute inset-0 bg-slate-900/90 z-[95] hidden flex-col items-center justify-center p-6 text-center fade-in">
+                <div class="bg-white dark:bg-darkcard rounded-3xl p-8 max-w-sm w-full shadow-2xl">
+                    <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-exclamation-triangle text-3xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Usuwanie konta</h2>
+                    <p class="text-sm text-gray-500 mb-6">Ta operacja jest nieodwracalna. Wszystkie Twoje dane, pary i wiadomości zostaną skasowane.</p>
+                    
+                    <div id="deletePassContainer" class="relative mb-4">
+                        <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="password" id="deletePassInput" placeholder="Potwierdź swoim hasłem" class="w-full h-12 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-red-500 transition font-medium text-sm">
+                    </div>
+                    <p id="deleteError" class="text-red-500 text-xs font-bold mt-1 mb-4 hidden">Błąd</p>
+
+                    <button onclick="confirmDeleteAccount(this)" class="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center mb-3">
+                        Tak, usuń moje konto
+                    </button>
+                    <button onclick="closeDeleteAccountModal()" class="w-full h-12 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-white font-bold rounded-xl transition flex items-center justify-center">
+                        Anuluj
+                    </button>
                 </div>
             </div>
 
