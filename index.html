@@ -4,16 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Sport Matcher</title>
-    
-    <!-- PWA / NATIVE APP META TAGS -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#022c22" media="(prefers-color-scheme: dark)">
-    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=SM&background=22c55e&color=fff&size=512">
-    <link rel="manifest" href="manifest.json">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         if (window.tailwind) {
@@ -22,11 +12,11 @@
                 theme: {
                     extend: {
                         colors: {
-                            darkbg: '#022c22',
-                            darkcard: '#064e3b', 
-                            primary: '#22c55e',
+                            darkbg: '#0f172a', 
+                            darkcard: '#1e293b', 
+                            primary: '#22c55e', 
                             primaryHover: '#16a34a',
-                            accent: '#f97316'
+                            accent: '#f97316' 
                         }
                     }
                 }
@@ -35,19 +25,15 @@
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- FIREBASE LOGOWANIE I BAZA DANYCH (Firestore) -->
+    <!-- FIREBASE LOGOWANIE I REJESTRACJA -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { 
-          getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, query, where, deleteDoc 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { 
           getAuth, 
           createUserWithEmailAndPassword, 
           signInWithEmailAndPassword,
           sendEmailVerification,
           GoogleAuthProvider,
-          FacebookAuthProvider,
           signInWithPopup,
           deleteUser,
           EmailAuthProvider,
@@ -67,25 +53,27 @@
       
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
-        const facebookProvider = new FacebookAuthProvider();
-        
-        // Udostępnienie instancji Firebase na zewnątrz do dolnego skryptu
-        window.auth = auth;
-        window.db = db;
-        window.firestore = { doc, getDoc, setDoc, collection, getDocs, addDoc, query, where, deleteDoc };
       
+        // Udostępnianie instancji do obiektu window dla innych funkcji
+        window.auth = auth;
+
         window.realEmailRegister = (btn) => {
           const email = document.getElementById('regEmailInput').value.trim();
           const pass = document.getElementById('regPassInput').value.trim();
-          const login = document.getElementById('regLoginInput').value.trim();
+          const passConfirm = document.getElementById('regPassConfirmInput').value.trim();
           const errEl = document.getElementById('regError');
       
-          if(!email || !pass || !login) { 
-              errEl.innerText = "Uzupełnij wszystkie dane!";
+          if(!email || !pass || !passConfirm) { 
+              errEl.innerText = currentLang === 'pl' ? "Uzupełnij wszystkie dane!" : "Fill all fields!";
               errEl.classList.remove('hidden'); 
               return; 
+          }
+
+          if(pass !== passConfirm) {
+              errEl.innerText = currentLang === 'pl' ? "Hasła nie są identyczne!" : "Passwords do not match!";
+              errEl.classList.remove('hidden'); 
+              return;
           }
           
           const origText = btn.innerHTML;
@@ -94,15 +82,28 @@
       
           createUserWithEmailAndPassword(auth, email, pass)
             .then((userCredential) => {
-              sendEmailVerification(userCredential.user).then(() => {
-                  btn.innerHTML = origText; btn.disabled = false;
+              sendEmailVerification(userCredential.user)
+                .then(() => {
+                  btn.innerHTML = origText;
+                  btn.disabled = false;
                   document.getElementById('loginScreen').classList.add('hidden');
-                  document.getElementById('emailConfirmModal').classList.remove('hidden');
-                  document.getElementById('emailConfirmModal').classList.add('flex');
-              });
-            }).catch((error) => {
-              btn.innerHTML = origText; btn.disabled = false;
-              errEl.innerText = error.code === 'auth/email-already-in-use' ? "Ten e-mail jest już zajęty!" : "Błąd rejestracji: " + error.message;
+                  const confScreen = document.getElementById('emailConfirmModal');
+                  if(confScreen) {
+                      confScreen.classList.remove('hidden');
+                      confScreen.classList.add('flex');
+                  }
+                });
+            })
+            .catch((error) => {
+              btn.innerHTML = origText;
+              btn.disabled = false;
+              if (error.code === 'auth/email-already-in-use') {
+                  errEl.innerText = currentLang === 'pl' ? "Ten e-mail jest już zajęty!" : "Email already in use!";
+              } else if (error.code === 'auth/weak-password') {
+                  errEl.innerText = currentLang === 'pl' ? "Hasło jest za słabe (min. 6 znaków)!" : "Password is too weak!";
+              } else {
+                  errEl.innerText = "Błąd rejestracji: " + error.message;
+              }
               errEl.classList.remove('hidden');
             });
         };
@@ -111,59 +112,66 @@
           const email = document.getElementById('loginEmailInput').value.trim();
           const pass = document.getElementById('loginPassInput').value.trim();
           const errEl = document.getElementById('loginError');
-          if(!email || !pass) { errEl.classList.remove('hidden'); return; }
+      
+          if(!email || !pass) { 
+              errEl.innerText = currentLang === 'pl' ? "Uzupełnij wszystkie dane!" : "Fill all fields!";
+              errEl.classList.remove('hidden'); 
+              return; 
+          }
           
           const origText = btn.innerHTML;
-          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>'; btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+          btn.disabled = true;
 
           signInWithEmailAndPassword(auth, email, pass)
             .then((userCredential) => {
-              btn.innerHTML = origText; btn.disabled = false;
-              if (!userCredential.user.emailVerified) { errEl.innerText = "Potwierdź e-mail!"; errEl.classList.remove('hidden'); return; }
-              if(typeof window.proceedToApp === 'function') window.proceedToApp();
-            }).catch((error) => {
-              btn.innerHTML = origText; btn.disabled = false;
-              errEl.innerText = "Błędny e-mail lub hasło!"; errEl.classList.remove('hidden');
+              btn.innerHTML = origText;
+              btn.disabled = false;
+              if (!userCredential.user.emailVerified) {
+                  errEl.innerText = currentLang === 'pl' ? "Najpierw potwierdź adres e-mail!" : "Confirm your email first!";
+                  errEl.classList.remove('hidden');
+                  return;
+              }
+              if(typeof window.proceedToApp === 'function') {
+                  window.proceedToApp();
+              }
+            })
+            .catch((error) => {
+              btn.innerHTML = origText;
+              btn.disabled = false;
+              if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                  errEl.innerText = currentLang === 'pl' ? "Błędny e-mail lub hasło!" : "Invalid email or password!";
+              } else {
+                  errEl.innerText = "Błąd: " + error.message;
+              }
+              errEl.classList.remove('hidden');
             });
         };
 
-        window.realGoogleLogin = (btn) => {
-          const origText = btn.innerHTML;
-          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>'; btn.disabled = true;
-          
-          signInWithPopup(auth, googleProvider).then((result) => {
-              btn.innerHTML = origText; btn.disabled = false;
-              if(typeof window.proceedToApp === 'function') window.proceedToApp();
-          }).catch((error) => { 
-              btn.innerHTML = origText; btn.disabled = false;
-              if (error.code !== 'auth/popup-closed-by-user') alert("Błąd logowania Google: " + error.message); 
-          });
-        };
-
-        window.realFacebookLogin = (btn) => {
-          const origText = btn.innerHTML;
-          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>'; btn.disabled = true;
-
-          signInWithPopup(auth, facebookProvider).then((result) => {
-              btn.innerHTML = origText; btn.disabled = false;
-              if(typeof window.proceedToApp === 'function') window.proceedToApp();
-          }).catch((error) => {
-              btn.innerHTML = origText; btn.disabled = false;
-              if (error.code === 'auth/account-exists-with-different-credential') {
-                  alert("BŁĄD: Masz już konto założone na ten sam adres e-mail, ale inną metodą (np. przez Google lub E-mail). Zaloguj się tamtą metodą!");
-              } else if (error.code !== 'auth/popup-closed-by-user') {
-                  alert("Błąd logowania Facebook: " + error.message);
+        window.realGoogleLogin = () => {
+          signInWithPopup(auth, googleProvider)
+            .then((result) => {
+              if(typeof window.proceedToApp === 'function') {
+                  window.proceedToApp();
               }
-          });
+            })
+            .catch((error) => {
+              alert("Błąd logowania Google: " + error.message);
+            });
         };
 
         window.openDeleteAccountModal = () => {
             const user = auth.currentUser;
             if(!user) return;
-            const passContainer = document.getElementById('deletePassContainer');
-            if (user.providerData.some(p => p.providerId === 'password')) passContainer.classList.remove('hidden');
-            else passContainer.classList.add('hidden');
             
+            // Ukryj/pokaż pole na hasło w zależności od metody logowania
+            const passContainer = document.getElementById('deletePassContainer');
+            if (user.providerData.some(p => p.providerId === 'password')) {
+                passContainer.classList.remove('hidden');
+            } else {
+                passContainer.classList.add('hidden');
+            }
+
             document.getElementById('deleteAccountModal').classList.remove('hidden');
             document.getElementById('deleteAccountModal').classList.add('flex');
             document.getElementById('deletePassInput').value = '';
@@ -180,30 +188,37 @@
             const errEl = document.getElementById('deleteError');
             const user = auth.currentUser;
 
-            if(!user) return;
+            if(!user) { errEl.innerText = "Błąd: Brak zalogowanego użytkownika."; errEl.classList.remove('hidden'); return; }
             if(!pass && user.providerData.some(p => p.providerId === 'password')) { errEl.innerText = "Podaj hasło!"; errEl.classList.remove('hidden'); return; }
 
             const origText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>'; btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+            btn.disabled = true;
 
             if(user.providerData.some(p => p.providerId === 'password')) {
                 const credential = EmailAuthProvider.credential(user.email, pass);
                 reauthenticateWithCredential(user, credential).then(() => {
                     deleteUser(user).then(() => {
-                        alert("Konto zostało pomyślnie usunięte z bazy danych.");
                         closeDeleteAccountModal();
                         if(typeof window.performLogout === 'function') window.performLogout();
+                    }).catch(err => {
+                        errEl.innerText = "Błąd usuwania: " + err.message; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                     });
-                }).catch(err => { errEl.innerText = "Błędne hasło!"; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false; });
+                }).catch(err => {
+                    errEl.innerText = "Podano błędne hasło!"; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
+                });
             } else {
                 deleteUser(user).then(() => {
-                    alert("Konto zostało usunięte."); closeDeleteAccountModal();
+                    closeDeleteAccountModal();
                     if(typeof window.performLogout === 'function') window.performLogout();
+                }).catch(err => {
+                    if(err.code === 'auth/requires-recent-login') errEl.innerText = "Wyloguj i zaloguj się ponownie (Google), by móc usunąć konto.";
+                    else errEl.innerText = "Błąd: " + err.message;
+                    errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                 });
             }
         };
     </script>
-
     <style>
         :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; min-height: 100vh; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
@@ -305,11 +320,11 @@
                             <button class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-apple text-xl mr-3 mb-1"></i><span class="font-semibold text-sm" data-i18n="logApple">Kontynuuj przez Apple</span>
                             </button>
-                            <button onclick="realGoogleLogin(this)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button onclick="realGoogleLogin()" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                 <span class="font-semibold text-sm" data-i18n="logGoogle">Kontynuuj przez Google</span>
                             </button>
-                            <button onclick="realFacebookLogin(this)" class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-facebook-f text-lg mr-3"></i><span class="font-semibold text-sm" data-i18n="logFB">Kontynuuj przez Facebook</span>
                             </button>
                         </div>
@@ -323,7 +338,7 @@
                         <div class="space-y-3 mb-4">
                             <div class="relative">
                                 <i class="fas fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="loginEmailInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phEmailLogin" placeholder="Adres e-mail lub login">
+                                <input type="text" id="loginEmailInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phEmail" placeholder="Adres e-mail">
                             </div>
                             <div class="relative">
                                 <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -348,16 +363,16 @@
                         
                         <div class="space-y-4 mb-6">
                             <div class="relative">
-                                <i class="fas fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="regLoginInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phLogin" placeholder="Twój login">
-                            </div>
-                            <div class="relative">
                                 <i class="fas fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                 <input type="email" id="regEmailInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phEmail" placeholder="Adres e-mail">
                             </div>
                             <div class="relative">
                                 <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                 <input type="password" id="regPassInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPass" placeholder="Hasło">
+                            </div>
+                            <div class="relative">
+                                <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="password" id="regPassConfirmInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPassConfirm" placeholder="Powtórz hasło">
                             </div>
                             <p id="regError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
                         </div>
@@ -375,19 +390,21 @@
             </div>
         </div>
 
-        <!-- 3.1 EKRAN POTWIERDZENIA E-MAIL -->
-        <div id="emailConfirmModal" class="absolute inset-0 z-[9500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden items-center justify-center text-center transition-colors duration-300">
-            <div class="w-24 h-24 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mb-6">
-                <i class="fas fa-envelope-open-text text-5xl"></i>
+        <!-- EKRAN POTWIERDZENIA E-MAIL -->
+        <div id="emailConfirmModal" class="absolute inset-0 z-[9500] bg-slate-900/80 hidden flex-col items-center justify-center p-6 fade-in">
+            <div class="bg-white dark:bg-darkcard rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+                <div class="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-envelope-open-text text-4xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
+                <p class="text-gray-600 dark:text-gray-400 text-sm mb-8" data-i18n="emailConfDesc">Wysłaliśmy link aktywacyjny na Twój adres. Kliknij go, a następnie zaloguj się do aplikacji!</p>
+                <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
+                    Rozumiem
+                </button>
             </div>
-            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
-            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!</p>
-            <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
-                Zrozumiałem
-            </button>
         </div>
 
-        <!-- 3.5 EKRAN ONBOARDINGU -->
+        <!-- EKRAN ONBOARDINGU -->
         <div id="onboardingScreen" class="absolute inset-0 z-[8500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden overflow-hidden transition-colors duration-300">
             <div class="flex flex-col items-center mt-4 mb-8">
                 <div class="w-20 h-20 mb-3 drop-shadow-md" id="onboardingLogoContainer"></div>
@@ -411,9 +428,10 @@
                         <input type="text" id="onbCity" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phCity" placeholder="Wpisz swoje miasto...">
                     </div>
                     <div class="relative">
-                        <i class="fas fa-heart absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" id="onbSport" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="onbSportOpt" placeholder="Ulubiony sport (Opcjonalnie)" oninput="filterOnboardingSports()" onfocus="toggleOnbSportDropdown(true)" autocomplete="off">
-                        <div id="onbSportDropdown" class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-y-auto"></div>
+                        <i class="fas fa-heart absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 z-10"></i>
+                        <input type="text" id="onbSportInput" autocomplete="off" oninput="filterOnbSports()" onclick="toggleOnbSportDropdown(true)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" placeholder="Ulubiony sport (Wpisz lub wybierz)" data-i18n-ph="onbSportOpt">
+                        <input type="hidden" id="onbSportValue">
+                        <div id="onbSportDropdown" class="hidden absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-y-auto"></div>
                     </div>
                     <p id="onbError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
                 </div>
@@ -478,7 +496,7 @@
                 </button>
             </main>
 
-            <!-- EKRAN POSTÓW -->
+            <!-- NOWY EKRAN POSTÓW (Tablica) -->
             <main id="postsScreen" class="flex-1 overflow-y-auto p-4 hidden flex-col bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
                 <div class="flex flex-wrap justify-between items-center mb-4 px-2 gap-3">
                     <h2 class="text-2xl font-bold text-gray-900 dark:text-white" data-i18n="navPosts">Posty</h2>
@@ -749,7 +767,7 @@
                         <label class="block text-xs font-bold text-gray-400 uppercase mb-1" data-i18n="profName">Imię, Wiek i Miasto</label>
                         <div id="viewNameAge" class="flex justify-between items-center">
                             <div class="font-bold text-lg text-gray-800 dark:text-white">
-                                <span id="displayName">Ty</span>, <span id="displayAge">...</span>
+                                <span id="displayName">Kamil</span>, <span id="displayAge">28</span>
                                 <div id="displayCity" class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-0.5"><i class="fas fa-map-marker-alt text-primary mr-1"></i> <span id="displayCityText">Wrocław</span></div>
                             </div>
                             <button onclick="toggleEdit('NameAge')" class="text-primary hover:bg-green-50 dark:hover:bg-gray-800 p-2 rounded-full transition"><i class="fas fa-edit"></i></button>
@@ -794,6 +812,23 @@
                     <button onclick="closeSettings()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white p-2"><i class="fas fa-times text-2xl"></i></button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3" data-i18n="setAccount">Konto</h3>
+                        <div class="bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm mb-6">
+                            <div class="px-4 py-3 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                                <span class="font-medium text-gray-700 dark:text-gray-200">E-mail</span>
+                                <span id="settingsEmail" class="text-sm text-gray-500 font-medium">...</span>
+                            </div>
+                            <div class="px-4 py-3 flex justify-between items-center">
+                                <span class="font-medium text-gray-700 dark:text-gray-200" data-i18n="setPass">Hasło</span>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-lg text-gray-400 translate-y-1">••••••••</span>
+                                    <button onclick="resetPasswordInfo()" class="text-primary hover:text-primaryHover transition"><i class="fas fa-eye-slash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3" data-i18n="setPref">Preferencje</h3>
                         <div class="bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
@@ -941,7 +976,7 @@
 
     <!-- PONIŻEJ ODBUDOWANY, CZYSTY KOD JAVASCRIPT BEZ DUPLIKATÓW -->
     <script>
-        // Przywrócenie renderowania loga
+        // Przywrócenie renderowania loga (bezpieczne, odporne na null)
         ['splashLogoContainer', 'loadingLogoContainer', 'loginLogoContainer', 'onboardingLogoContainer', 'mainScreenLogoContainer', 'headerLogoContainer'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.innerHTML = SVG_LOGO;
@@ -949,48 +984,6 @@
 
         // 1. ZARZĄDZANIE EKRANEM STARTOWYM
         function toggleDarkMode() { document.documentElement.classList.toggle('dark'); }
-
-        // Baza sportów
-        const allSports = [
-            { id: 'bieganie', name: 'Bieganie', icon: 'fa-shoe-prints', emoji: '🏃' }, { id: 'tenis', name: 'Tenis', icon: 'fa-table-tennis', emoji: '🎾' },
-            { id: 'silownia', name: 'Siłownia', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'rower', name: 'Rower', icon: 'fa-bicycle', emoji: '🚴' },
-            { id: 'koszykowka', name: 'Koszykówka', icon: 'fa-basketball-ball', emoji: '🏀' }, { id: 'siatkowka', name: 'Siatkówka', icon: 'fa-volleyball-ball', emoji: '🏐' },
-            { id: 'plywanie', name: 'Pływanie', icon: 'fa-swimmer', emoji: '🏊' }, { id: 'squash', name: 'Squash', icon: 'fa-stopwatch', emoji: '🏸' },
-            { id: 'pilkanozna', name: 'Piłka nożna', icon: 'fa-futbol', emoji: '⚽' }, { id: 'joga', name: 'Joga/Pilates', icon: 'fa-om', emoji: '🧘' },
-            { id: 'wspinaczka', name: 'Wspinaczka', icon: 'fa-mountain', emoji: '🧗' }, { id: 'rolki', name: 'Rolki', icon: 'fa-skating', emoji: '🛼' },
-            { id: 'pingpong', name: 'Tenis stołowy', icon: 'fa-table-tennis', emoji: '🏓' }, { id: 'badminton', name: 'Badminton', icon: 'fa-feather', emoji: '🏸' },
-            { id: 'boks', name: 'Sztuki walki', icon: 'fa-user-ninja', emoji: '🥊' }, { id: 'taniec', name: 'Taniec', icon: 'fa-music', emoji: '💃' },
-            { id: 'szachy', name: 'Szachy', icon: 'fa-chess', emoji: '♟️' }, { id: 'narty', name: 'Narciarstwo', icon: 'fa-skiing', emoji: '⛷️' },
-            { id: 'snowboard', name: 'Snowboard', icon: 'fa-snowboarding', emoji: '🏂' }, { id: 'golf', name: 'Golf', icon: 'fa-golf-ball', emoji: '⛳' },
-            { id: 'kalistenika', name: 'Kalistenika', icon: 'fa-child', emoji: '🤸' }, { id: 'crossfit', name: 'CrossFit', icon: 'fa-dumbbell', emoji: '🏋️‍♂️' },
-            { id: 'mma', name: 'MMA', icon: 'fa-fist-raised', emoji: '🤼' }, { id: 'bjj', name: 'BJJ', icon: 'fa-user-ninja', emoji: '🥋' },
-            { id: 'trekking', name: 'Trekking', icon: 'fa-hiking', emoji: '🥾' }, { id: 'nordic', name: 'Nordic Walking', icon: 'fa-walking', emoji: '🦯' },
-            { id: 'rowerszosowy', name: 'Rower szosowy', icon: 'fa-biking', emoji: '🚴‍♂️' }, { id: 'mtb', name: 'Rower MTB', icon: 'fa-mountain', emoji: '🚵' },
-            { id: 'bieginor', name: 'Biegi na orientację', icon: 'fa-map-signs', emoji: '🧭' }, { id: 'triathlon', name: 'Triathlon', icon: 'fa-swimmer', emoji: '🏊‍♂️' },
-            { id: 'kajaki', name: 'Kajakarstwo', icon: 'fa-water', emoji: '🛶' }, { id: 'sup', name: 'SUP', icon: 'fa-water', emoji: '🏄‍♂️' },
-            { id: 'windsurfing', name: 'Windsurfing', icon: 'fa-wind', emoji: '🌬️' }, { id: 'kitesurfing', name: 'Kitesurfing', icon: 'fa-kite', emoji: '🪁' },
-            { id: 'zeglarstwo', name: 'Żeglarstwo', icon: 'fa-ship', emoji: '⛵' }, { id: 'nurkowanie', name: 'Nurkowanie', icon: 'fa-water', emoji: '🤿' },
-            { id: 'lyzwy', name: 'Łyżwiarstwo figurowe', icon: 'fa-ice-skate', emoji: '⛸️' }, { id: 'hokej', name: 'Hokej', icon: 'fa-hockey-puck', emoji: '🏒' },
-            { id: 'curling', name: 'Curling', icon: 'fa-bullseye', emoji: '🥌' }, { id: 'rugby', name: 'Rugby', icon: 'fa-football-ball', emoji: '🏉' },
-            { id: 'futbolamer', name: 'Futbol ameryk.', icon: 'fa-football-ball', emoji: '🏈' }, { id: 'baseball', name: 'Baseball', icon: 'fa-baseball-ball', emoji: '⚾' },
-            { id: 'krykiet', name: 'Krykiet', icon: 'fa-cricket', emoji: '🏏' }, { id: 'bilard', name: 'Bilard/Snooker', icon: 'fa-circle', emoji: '🎱' },
-            { id: 'kregle', name: 'Kręgle', icon: 'fa-bowling-ball', emoji: '🎳' }, { id: 'lotki', name: 'Rzutki (Darts)', icon: 'fa-bullseye', emoji: '🎯' },
-            { id: 'lucznictwo', name: 'Łucznictwo', icon: 'fa-bullseye', emoji: '🏹' }, { id: 'strzelectwo', name: 'Strzelectwo', icon: 'fa-crosshairs', emoji: '🔫' },
-            { id: 'jezdziectwo', name: 'Jeździectwo', icon: 'fa-horse', emoji: '🏇' }, { id: 'szermierka', name: 'Szermierka', icon: 'fa-khanda', emoji: '🤺' },
-            { id: 'gimnastyka', name: 'Gimnastyka', icon: 'fa-child', emoji: '🤸‍♀️' }, { id: 'akrobatyka', name: 'Akrobatyka', icon: 'fa-child', emoji: '🤸‍♂️' },
-            { id: 'zumba', name: 'Zumba', icon: 'fa-users', emoji: '👯' }, { id: 'pole', name: 'Pole Dance', icon: 'fa-user', emoji: '💃' },
-            { id: 'aerial', name: 'Aerial Hoop', icon: 'fa-ring', emoji: '⭕' }, { id: 'padel', name: 'Padel', icon: 'fa-table-tennis', emoji: '🏓' },
-            { id: 'esport', name: 'E-sport', icon: 'fa-gamepad', emoji: '🎮' }, { id: 'wedkarstwo', name: 'Wędkarstwo', icon: 'fa-fish', emoji: '🎣' },
-            { id: 'skokinarciarskie', name: 'Skoki narciarskie', icon: 'fa-skiing', emoji: '⛷️' }, { id: 'hokejnatrawie', name: 'Hokej na trawie', icon: 'fa-hockey-puck', emoji: '🏑' },
-            { id: 'kolarstwotorowe', name: 'Kolarstwo torowe', icon: 'fa-bicycle', emoji: '🚴' }, { id: 'surfing', name: 'Surfing', icon: 'fa-water', emoji: '🏄' },
-            { id: 'karting', name: 'Karting', icon: 'fa-car', emoji: '🏎️' }, { id: 'parkour', name: 'Parkour', icon: 'fa-shoe-prints', emoji: '🏃' },
-            { id: 'alpinizm', name: 'Alpinizm', icon: 'fa-mountain', emoji: '🧗‍♂️' }, { id: 'bouldering', name: 'Bouldering', icon: 'fa-mountain', emoji: '🧗‍♀️' },
-            { id: 'trojboj', name: 'Trójbój siłowy', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'judo', name: 'Judo', icon: 'fa-user-ninja', emoji: '🥋' },
-            { id: 'karate', name: 'Karate', icon: 'fa-user-ninja', emoji: '🥋' }, { id: 'taekwondo', name: 'Taekwondo', icon: 'fa-user-ninja', emoji: '🥋' }
-        ];
-
-        let selectedSport = 'bieganie';
-        let topSports = ['bieganie', 'tenis', 'silownia', 'rower'];
 
         window.addEventListener('load', () => {
             renderNewPostSports();
@@ -1001,7 +994,7 @@
                 if (filterSportSel) filterSportSel.innerHTML += `<option value="${s.id}">${s.emoji} ${s.name}</option>`; 
             });
             
-            renderSportGrid(); renderProfileInterests();
+            renderSportGrid(); renderPosts(); renderProfileInterests();
             
             setTimeout(() => {
                 const splash = document.getElementById('splashScreen');
@@ -1026,111 +1019,90 @@
             document.getElementById('loginError').classList.add('hidden'); document.getElementById('regError').classList.add('hidden');
         }
 
+        function simulateLogin(provider) {
+            if (provider === 'email') {
+                if(!document.getElementById('loginEmailInput').value.trim() || !document.getElementById('loginPassInput').value.trim()) { 
+                    document.getElementById('loginError').innerText = i18n[currentLang].fillDataErr;
+                    document.getElementById('loginError').classList.remove('hidden'); 
+                    return; 
+                }
+                document.getElementById('loginError').classList.add('hidden');
+            } else if (provider === 'create') {
+                const emailVal = document.getElementById('regEmailInput').value.trim();
+                if(!document.getElementById('regLoginInput').value.trim() || !emailVal || !document.getElementById('regPassInput').value.trim()) { 
+                    document.getElementById('regError').innerText = i18n[currentLang].fillDataErr;
+                    document.getElementById('regError').classList.remove('hidden'); 
+                    return; 
+                }
+                if(!emailVal.includes('@')) {
+                    document.getElementById('regError').innerText = currentLang === 'pl' ? "Podaj poprawny adres e-mail (zawierający @)!" : "Enter a valid email address (with @)!";
+                    document.getElementById('regError').classList.remove('hidden'); 
+                    return;
+                }
+                document.getElementById('regError').classList.add('hidden');
+                
+                const loginScreen = document.getElementById('loginScreen');
+                loginScreen.classList.add('screen-exit-active');
+                setTimeout(() => {
+                    loginScreen.classList.add('hidden'); loginScreen.classList.remove('screen-exit-active');
+                    const confScreen = document.getElementById('emailConfirmModal');
+                    confScreen.classList.remove('hidden'); confScreen.classList.add('screen-enter-active', 'flex');
+                    setTimeout(() => { confScreen.classList.remove('screen-enter-active'); }, 500);
+                }, 400);
+                return; 
+            }
+            proceedToApp();
+        }
+
         function closeEmailConfirmAndContinue() {
             const confScreen = document.getElementById('emailConfirmModal');
             confScreen.classList.add('screen-exit-active');
             setTimeout(() => {
                 confScreen.classList.add('hidden'); confScreen.classList.remove('flex', 'screen-exit-active');
-                
-                // Cofnięcie do panelu logowania!
-                const loginScreen = document.getElementById('loginScreen');
-                loginScreen.classList.remove('hidden');
-                loginScreen.classList.add('screen-enter-active');
-                window.toggleAuthPanel('login');
-                
-                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
+                proceedToApp();
             }, 400);
         }
 
-        window.proceedToApp = async () => {
-            const user = window.auth ? window.auth.currentUser : null;
-            if(!user) return;
-
-            try {
-                // Sprawdzamy, czy ten użytkownik zakładał już kiedyś u nas profil (w bazie)
-                const userDocRef = window.firestore.doc(window.db, "users", user.uid);
-                const userDocSnap = await window.firestore.getDoc(userDocRef);
-                
+        function proceedToApp() {
+            const loader = document.getElementById('loadingScreen'); loader.classList.remove('hidden');
+            setTimeout(() => {
+                loader.classList.add('hidden');
                 const loginScreen = document.getElementById('loginScreen'); 
-                
-                if(loginScreen && !loginScreen.classList.contains('hidden')) {
+                if(!loginScreen.classList.contains('hidden')) {
                     loginScreen.classList.add('screen-exit-active');
                     setTimeout(() => {
-                        loginScreen.classList.add('hidden'); 
-                        loginScreen.classList.remove('screen-exit-active');
+                        loginScreen.classList.add('hidden'); loginScreen.classList.remove('screen-exit-active');
+                        showOnboarding();
                     }, 400); 
-                }
-
-                if(userDocSnap.exists()) {
-                    // Profil istnieje - przywracamy dane i POMIJAMY Onboarding
-                    const data = userDocSnap.data();
-                    
-                    document.getElementById('displayName').innerText = data.name || "Gracz";
-                    document.getElementById('inputName').value = data.name || "";
-                    document.getElementById('displayAge').innerText = data.age || "";
-                    document.getElementById('inputAge').value = data.age || "";
-                    document.getElementById('displayCityText').innerText = data.city || "";
-                    document.getElementById('inputProfileCity').value = data.city || "";
-                    
-                    if(document.getElementById('postCityFilter')) document.getElementById('postCityFilter').value = data.city || "";
-                    if(document.getElementById('newPostCity')) document.getElementById('newPostCity').value = data.city || "";
-
-                    if(data.bio) {
-                        document.getElementById('displayBio').innerText = data.bio;
-                        document.getElementById('inputBio').value = data.bio;
-                        document.getElementById('displayBio').classList.remove('italic', 'text-gray-400');
-                    }
-
-                    if(data.interests && Array.isArray(data.interests)) {
-                        userInterests = data.interests;
-                        if(typeof renderProfileInterests === 'function') renderProfileInterests();
-                    }
-
-                    // Wchodzimy od razu w głąb aplikacji
-                    const appCont = document.getElementById('appContainer'); 
-                    appCont.classList.remove('hidden'); 
-                    appCont.classList.add('screen-enter-active');
-                    document.getElementById('preferencesScreen').classList.remove('hidden');
-                    
-                    setTimeout(() => { 
-                        appCont.classList.remove('screen-enter-active'); 
-                        if(typeof loadPostsFromDB === 'function') loadPostsFromDB();
-                    }, 500);
-
                 } else {
-                    // Profilu jeszcze nie ma (Nowy uzytkownik) - kierujemy go na ekran podawania danych
                     showOnboarding();
                 }
-            } catch(e) {
-                console.error("Błąd ładowania danych profilu:", e);
-                loader.classList.add('hidden');
-                
-                // Bezpiecznik: Upewniamy się, że ekran logowania zniknie nawet przy błędzie neta
-                const loginScreen = document.getElementById('loginScreen'); 
-                if(loginScreen && !loginScreen.classList.contains('hidden')) {
-                    loginScreen.classList.add('hidden'); 
-                }
-                
-                showOnboarding(); // W razie kłopotu profilaktycznie wyrzucamy na Onboarding
-            }
-        };
+            }, 1500); 
+        }
 
-        window.performLogout = () => {
-            const appCont = document.getElementById('appContainer'); 
-            // Zabezpieczenie przed podwójnym kliknięciem / podwójną animacją
-            if(appCont.classList.contains('screen-exit-active') || appCont.classList.contains('hidden')) return;
-
-            if(window.auth) window.auth.signOut(); // Faktyczne wylogowanie z sesji Firebase
+        function performLogout() {
             closeSettings(); 
-            
-            appCont.classList.add('screen-exit-active');
+            const appCont = document.getElementById('appContainer'); appCont.classList.add('screen-exit-active');
             setTimeout(() => {
                 appCont.classList.add('hidden'); appCont.classList.remove('screen-exit-active');
+                document.getElementById('preferencesScreen').classList.add('hidden'); 
+                document.getElementById('postsScreen').classList.add('hidden'); 
+                document.getElementById('messagesScreen').classList.add('hidden'); 
+                document.getElementById('profileScreen').classList.add('hidden'); 
+                document.getElementById('swipeScreen').classList.add('hidden');
                 
-                // Odświeżamy stronę całkowicie (Najlepsze wyjście dla apek PWA - resetuje zacięcia i pamięć!)
-                location.reload();
+                const loginScreen = document.getElementById('loginScreen'); 
+                loginScreen.classList.remove('hidden'); loginScreen.classList.add('screen-enter-active');
+                toggleAuthPanel('login'); 
+                
+                document.getElementById('loginEmailInput').value = ''; 
+                document.getElementById('loginPassInput').value = ''; 
+                document.getElementById('regEmailInput').value = ''; 
+                document.getElementById('regPassInput').value = '';
+                document.getElementById('regPassConfirmInput').value = '';
+                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
             }, 400);
-        };
+        }
 
         // 3. ONBOARDING
         function showOnboarding() {
@@ -1174,7 +1146,7 @@
             toggleOnbSportDropdown(hasVisible && val.length > 0);
         }
 
-        // Zamknięcie dropdowna po kliknięciu poza niego
+        // Zamknięcie dropdowna po kliknięciu poza niego (obsługa ogólna dla onb i postów)
         document.addEventListener('click', (e) => {
             const onbDropdown = document.getElementById('onbSportDropdown');
             const onbInput = document.getElementById('onbSport');
@@ -1182,9 +1154,9 @@
                 toggleOnbSportDropdown(false);
             }
         });
+        // --- Koniec autouzupełniania ---
 
-        // Właściwy zapis do bazy z onboarding
-        window.finishOnboarding = async () => {
+        function finishOnboarding() {
             const name = document.getElementById('onbName').value.trim();
             const age = document.getElementById('onbAge').value.trim();
             const city = document.getElementById('onbCity').value.trim();
@@ -1198,32 +1170,21 @@
             document.getElementById('displayAge').innerText = age; document.getElementById('inputAge').value = age;
             document.getElementById('displayCityText').innerText = city; document.getElementById('inputProfileCity').value = city;
             
+            // Ustaw jako domyślne do nowej tablicy
             document.getElementById('postCityFilter').value = city;
             document.getElementById('newPostCity').value = city;
 
             const selectedOnbSport = document.getElementById('onbSport').value.trim();
-            let finalSport = null;
             if(selectedOnbSport) {
                 const matched = allSports.find(s => s.name.toLowerCase() === selectedOnbSport.toLowerCase() || s.id === selectedOnbSport.toLowerCase());
-                if (matched) { finalSport = matched.id; } 
-                else {
-                    finalSport = 'custom_' + Date.now();
-                    allSports.push({id: finalSport, name: selectedOnbSport, icon: 'fa-star', emoji: '⭐'});
+                if (matched) {
+                    userInterests = [matched.id];
+                } else {
+                    const customId = 'custom_' + Date.now();
+                    allSports.push({id: customId, name: selectedOnbSport, icon: 'fa-star', emoji: '⭐'});
+                    userInterests = [customId];
                 }
-                userInterests = [finalSport];
                 renderProfileInterests();
-            }
-
-            // FIREBASE: Zapis do chmury!
-            const user = window.auth.currentUser;
-            if(user) {
-                try {
-                    await window.firestore.setDoc(window.firestore.doc(window.db, "users", user.uid), {
-                        name: name, age: age, city: city, sport: finalSport || 'bieganie',
-                        bio: "Brak opisu.", interests: userInterests,
-                        photo: "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"
-                    });
-                } catch(e) { console.error("Error saving profile:", e); }
             }
 
             const onbScreen = document.getElementById('onboardingScreen'); onbScreen.classList.add('screen-exit-active');
@@ -1231,10 +1192,7 @@
                 onbScreen.classList.add('hidden'); onbScreen.classList.remove('screen-exit-active');
                 const appCont = document.getElementById('appContainer'); appCont.classList.remove('hidden'); appCont.classList.add('screen-enter-active');
                 document.getElementById('preferencesScreen').classList.remove('hidden');
-                setTimeout(() => { 
-                    appCont.classList.remove('screen-enter-active'); 
-                    loadPostsFromDB(); // Od razu pobierz tablice!
-                }, 500);
+                setTimeout(() => { appCont.classList.remove('screen-enter-active'); renderPosts(); }, 500);
             }, 400);
         }
 
@@ -1267,13 +1225,12 @@
 
         let isPro = false;
         
+        // Symulacja powrotu ze Stripe'a (w normalnej apce to robi backend przez webhook)
         function simulateStripeSuccess() {
             setTimeout(() => {
                 upgradeToPlan('PRO');
-                if(typeof window.showMessage === 'function') {
-                    window.showMessage("Płatność udana", "Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!");
-                }
-            }, 2000); 
+                alert("Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!");
+            }, 2000); // Udaje opóźnienie weryfikacji
         }
 
         function upgradeToPlan(planType) {
@@ -1284,6 +1241,48 @@
         }
 
         function previewImage(event) { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { document.getElementById('profileImage').src = e.target.result; document.getElementById('yourMatchImg').src = e.target.result; }; reader.readAsDataURL(event.target.files[0]); } }
+
+        // 5. BAZA SPORTÓW
+        const allSports = [
+            { id: 'bieganie', name: 'Bieganie', icon: 'fa-shoe-prints', emoji: '🏃' }, { id: 'tenis', name: 'Tenis', icon: 'fa-table-tennis', emoji: '🎾' },
+            { id: 'silownia', name: 'Siłownia', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'rower', name: 'Rower', icon: 'fa-bicycle', emoji: '🚴' },
+            { id: 'koszykowka', name: 'Koszykówka', icon: 'fa-basketball-ball', emoji: '🏀' }, { id: 'siatkowka', name: 'Siatkówka', icon: 'fa-volleyball-ball', emoji: '🏐' },
+            { id: 'plywanie', name: 'Pływanie', icon: 'fa-swimmer', emoji: '🏊' }, { id: 'squash', name: 'Squash', icon: 'fa-stopwatch', emoji: '🏸' },
+            { id: 'pilkanozna', name: 'Piłka nożna', icon: 'fa-futbol', emoji: '⚽' }, { id: 'joga', name: 'Joga/Pilates', icon: 'fa-om', emoji: '🧘' },
+            { id: 'wspinaczka', name: 'Wspinaczka', icon: 'fa-mountain', emoji: '🧗' }, { id: 'rolki', name: 'Rolki', icon: 'fa-skating', emoji: '🛼' },
+            { id: 'pingpong', name: 'Tenis stołowy', icon: 'fa-table-tennis', emoji: '🏓' }, { id: 'badminton', name: 'Badminton', icon: 'fa-feather', emoji: '🏸' },
+            { id: 'boks', name: 'Sztuki walki', icon: 'fa-user-ninja', emoji: '🥊' }, { id: 'taniec', name: 'Taniec', icon: 'fa-music', emoji: '💃' },
+            { id: 'szachy', name: 'Szachy', icon: 'fa-chess', emoji: '♟️' }, { id: 'narty', name: 'Narciarstwo', icon: 'fa-skiing', emoji: '⛷️' },
+            { id: 'snowboard', name: 'Snowboard', icon: 'fa-snowboarding', emoji: '🏂' }, { id: 'golf', name: 'Golf', icon: 'fa-golf-ball', emoji: '⛳' },
+            { id: 'kalistenika', name: 'Kalistenika', icon: 'fa-child', emoji: '🤸' }, { id: 'crossfit', name: 'CrossFit', icon: 'fa-dumbbell', emoji: '🏋️‍♂️' },
+            { id: 'mma', name: 'MMA', icon: 'fa-fist-raised', emoji: '🤼' }, { id: 'bjj', name: 'BJJ', icon: 'fa-user-ninja', emoji: '🥋' },
+            { id: 'trekking', name: 'Trekking', icon: 'fa-hiking', emoji: '🥾' }, { id: 'nordic', name: 'Nordic Walking', icon: 'fa-walking', emoji: '🦯' },
+            { id: 'rowerszosowy', name: 'Rower szosowy', icon: 'fa-biking', emoji: '🚴‍♂️' }, { id: 'mtb', name: 'Rower MTB', icon: 'fa-mountain', emoji: '🚵' },
+            { id: 'bieginor', name: 'Biegi na orientację', icon: 'fa-map-signs', emoji: '🧭' }, { id: 'triathlon', name: 'Triathlon', icon: 'fa-swimmer', emoji: '🏊‍♂️' },
+            { id: 'kajaki', name: 'Kajakarstwo', icon: 'fa-water', emoji: '🛶' }, { id: 'sup', name: 'SUP', icon: 'fa-water', emoji: '🏄‍♂️' },
+            { id: 'windsurfing', name: 'Windsurfing', icon: 'fa-wind', emoji: '🌬️' }, { id: 'kitesurfing', name: 'Kitesurfing', icon: 'fa-kite', emoji: '🪁' },
+            { id: 'zeglarstwo', name: 'Żeglarstwo', icon: 'fa-ship', emoji: '⛵' }, { id: 'nurkowanie', name: 'Nurkowanie', icon: 'fa-water', emoji: '🤿' },
+            { id: 'lyzwy', name: 'Łyżwiarstwo figurowe', icon: 'fa-ice-skate', emoji: '⛸️' }, { id: 'hokej', name: 'Hokej', icon: 'fa-hockey-puck', emoji: '🏒' },
+            { id: 'curling', name: 'Curling', icon: 'fa-bullseye', emoji: '🥌' }, { id: 'rugby', name: 'Rugby', icon: 'fa-football-ball', emoji: '🏉' },
+            { id: 'futbolamer', name: 'Futbol ameryk.', icon: 'fa-football-ball', emoji: '🏈' }, { id: 'baseball', name: 'Baseball', icon: 'fa-baseball-ball', emoji: '⚾' },
+            { id: 'krykiet', name: 'Krykiet', icon: 'fa-cricket', emoji: '🏏' }, { id: 'bilard', name: 'Bilard/Snooker', icon: 'fa-circle', emoji: '🎱' },
+            { id: 'kregle', name: 'Kręgle', icon: 'fa-bowling-ball', emoji: '🎳' }, { id: 'lotki', name: 'Rzutki (Darts)', icon: 'fa-bullseye', emoji: '🎯' },
+            { id: 'lucznictwo', name: 'Łucznictwo', icon: 'fa-bullseye', emoji: '🏹' }, { id: 'strzelectwo', name: 'Strzelectwo', icon: 'fa-crosshairs', emoji: '🔫' },
+            { id: 'jezdziectwo', name: 'Jeździectwo', icon: 'fa-horse', emoji: '🏇' }, { id: 'szermierka', name: 'Szermierka', icon: 'fa-khanda', emoji: '🤺' },
+            { id: 'gimnastyka', name: 'Gimnastyka', icon: 'fa-child', emoji: '🤸‍♀️' }, { id: 'akrobatyka', name: 'Akrobatyka', icon: 'fa-child', emoji: '🤸‍♂️' },
+            { id: 'zumba', name: 'Zumba', icon: 'fa-users', emoji: '👯' }, { id: 'pole', name: 'Pole Dance', icon: 'fa-user', emoji: '💃' },
+            { id: 'aerial', name: 'Aerial Hoop', icon: 'fa-ring', emoji: '⭕' }, { id: 'padel', name: 'Padel', icon: 'fa-table-tennis', emoji: '🏓' },
+            { id: 'esport', name: 'E-sport', icon: 'fa-gamepad', emoji: '🎮' }, { id: 'wedkarstwo', name: 'Wędkarstwo', icon: 'fa-fish', emoji: '🎣' },
+            { id: 'skokinarciarskie', name: 'Skoki narciarskie', icon: 'fa-skiing', emoji: '⛷️' }, { id: 'hokejnatrawie', name: 'Hokej na trawie', icon: 'fa-hockey-puck', emoji: '🏑' },
+            { id: 'kolarstwotorowe', name: 'Kolarstwo torowe', icon: 'fa-bicycle', emoji: '🚴' }, { id: 'surfing', name: 'Surfing', icon: 'fa-water', emoji: '🏄' },
+            { id: 'karting', name: 'Karting', icon: 'fa-car', emoji: '🏎️' }, { id: 'parkour', name: 'Parkour', icon: 'fa-shoe-prints', emoji: '🏃' },
+            { id: 'alpinizm', name: 'Alpinizm', icon: 'fa-mountain', emoji: '🧗‍♂️' }, { id: 'bouldering', name: 'Bouldering', icon: 'fa-mountain', emoji: '🧗‍♀️' },
+            { id: 'trojboj', name: 'Trójbój siłowy', icon: 'fa-dumbbell', emoji: '🏋️' }, { id: 'judo', name: 'Judo', icon: 'fa-user-ninja', emoji: '🥋' },
+            { id: 'karate', name: 'Karate', icon: 'fa-user-ninja', emoji: '🥋' }, { id: 'taekwondo', name: 'Taekwondo', icon: 'fa-user-ninja', emoji: '🥋' }
+        ];
+
+        let selectedSport = 'bieganie';
+        let topSports = ['bieganie', 'tenis', 'silownia', 'rower'];
 
         function renderSportGrid() {
             const grid = document.getElementById('sportGrid'); grid.innerHTML = '';
@@ -1374,32 +1373,34 @@
         const i18n = {
             pl: {
                 appTitle: "Zacznij trening!", appSubtitle: "Wybierz miasto i sport, aby znaleźć partnerów.", locationLbl: "Lokalizacja", disciplineLbl: "Dyscyplina",
-                btnSearch: "Szukaj partnerów", noProfTitle: "Brak profili", noProfDesc: "Zmień filtry, by poszukać ponownie.", btnChangeSet: "Zmień ustawienia",
+                btnSearch: "Szukaj partnerów", noProfTitle: "Brak profili", noProfDesc: "Rozszerz kryteria wyszukiwania.", btnChangeSet: "Zmień ustawienia",
                 matchNew: "Nowe Pary", matchMsg: "Wiadomości", botNow: "Teraz", botPreview: "Gotowy na dzisiejszy trening?", botIntro: "Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪",
                 chatAlways: "Zawsze aktywny", chatToday: "Dziś", profTitle: "Twój Profil", profPrem: "Konto Premium Aktywne", profFree: "Plan Darmowy", profName: "Imię, Wiek i Miasto", profBio: "Moje bio", profInt: "Zainteresowania Sportowe",
                 setMain: "Ustawienia", setPref: "Preferencje", setLang: "Język aplikacji", setPush: "Powiadomienia Push", setDark: "Tryb Ciemny",
+                setAccount: "Konto", setPass: "Hasło",
                 setInfo: "Informacje i Pomoc", setTerms: "Regulamin", setPriv: "Polityka Prywatności", setHelp: "Centrum Pomocy",
                 setLogout: "Wyloguj się", matchReady: "jest gotowy na trening!", matchGoMsg: "Przejdź do wiadomości", matchPlay: "Graj dalej", navSearch: "Szukaj", navChats: "Czaty", navProfile: "Profil", navPosts: "Posty",
                 loginSub: "Zaloguj się, aby zagrać.", logBtn: "Zaloguj się", orLog: "LUB", logApple: "Kontynuuj przez Apple", logGoogle: "Kontynuuj przez Google", logFB: "Kontynuuj przez Facebook", 
                 noAccount: "Nie masz konta?", registerBtn: "Zarejestruj się", regSub: "Stwórz konto i zacznij grać.", createBtn: "Stwórz konto", hasAccount: "Masz już konto?", loginBackBtn: "Zaloguj się",
-                placeholderText: "Napisz wiadomość...", phEmail: "Adres e-mail", phPass: "Hasło", phLogin: "Twój login", fillDataErr: "Uzupełnij wszystkie dane!",
-                phEmailLogin: "Adres e-mail lub login", phCity: "Twoje miasto", filterAll: "Wszystkie", chatAttachPhoto: "Wyślij zdjęcie", chatSuggestVenue: "Zaproponuj miejscówkę", venuesTitle: "Wybierz miejscówkę",
+                placeholderText: "Napisz wiadomość...", phEmail: "Adres e-mail", phPass: "Hasło", phPassConfirm: "Powtórz hasło", fillDataErr: "Uzupełnij wszystkie dane!",
+                phEmailLogin: "Adres e-mail", phCity: "Twoje miasto", filterAll: "Wszystkie", chatAttachPhoto: "Wyślij zdjęcie", chatSuggestVenue: "Zaproponuj miejscówkę", venuesTitle: "Wybierz miejscówkę",
                 onbTitle: "Jeszcze tylko chwila!", onbSub: "Wypełnij podstawowe dane, abyśmy mogli znaleźć Ci partnerów.", phName: "Twoje Imię", phAge: "Twój Wiek (Min. 18 lat)", onbStart: "Zaczynamy!",
                 onbSportOpt: "Ulubiony sport (Opcjonalnie)", addPostTitle: "Nowe ogłoszenie", addPostBtn: "Opublikuj",
-                emailConfTitle: "Potwierdź e-mail", emailConfDesc: "Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!", btnUnderstand: "Rozumiem"
+                emailConfTitle: "Potwierdź e-mail", emailConfDesc: "Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą!", btnUnderstand: "Rozumiem"
             },
             en: {
                 appTitle: "Start training!", appSubtitle: "Choose city and sport to find partners.", locationLbl: "Location", disciplineLbl: "Discipline",
-                btnSearch: "Find partners", noProfTitle: "No profiles", noProfDesc: "Change filters to search again.", btnChangeSet: "Change settings",
+                btnSearch: "Find partners", noProfTitle: "No profiles", noProfDesc: "Expand your search criteria.", btnChangeSet: "Change settings",
                 matchNew: "New Matches", matchMsg: "Messages", botNow: "Now", botPreview: "Ready for today's training?", botIntro: "Hi! I'm your virtual assistant. Planning any sports today? 💪",
                 chatAlways: "Always active", chatToday: "Today", profTitle: "Your Profile", profPrem: "Premium Account Active", profFree: "Free Plan", profName: "Name, Age & City", profBio: "My bio", profInt: "Sports Interests",
                 setMain: "Settings", setPref: "Preferences", setLang: "App Language", setPush: "Push Notifications", setDark: "Dark Mode",
+                setAccount: "Account", setPass: "Password",
                 setInfo: "Info & Help", setTerms: "Terms of Service", setPriv: "Privacy Policy", setHelp: "Help Center",
                 setLogout: "Log out", matchReady: "is ready to train!", matchGoMsg: "Go to messages", matchPlay: "Keep playing", navSearch: "Search", navChats: "Chats", navProfile: "Profile", navPosts: "Posts",
                 loginSub: "Log in to play.", logBtn: "Log in", orLog: "OR", logApple: "Continue with Apple", logGoogle: "Continue with Google", logFB: "Continue with Facebook", 
                 noAccount: "Don't have an account?", registerBtn: "Sign up", regSub: "Create account to start playing.", createBtn: "Create account", hasAccount: "Already have an account?", loginBackBtn: "Log in",
-                placeholderText: "Type a message...", phEmail: "Email address", phPass: "Password", phLogin: "Your username", fillDataErr: "Please fill in all fields!",
-                phEmailLogin: "Email or login", phCity: "Your city", filterAll: "All", chatAttachPhoto: "Send photo", chatSuggestVenue: "Suggest a venue", venuesTitle: "Select a venue",
+                placeholderText: "Type a message...", phEmail: "Email address", phPass: "Password", phPassConfirm: "Repeat password", fillDataErr: "Please fill in all fields!",
+                phEmailLogin: "Email address", phCity: "Your city", filterAll: "All", chatAttachPhoto: "Send photo", chatSuggestVenue: "Suggest a venue", venuesTitle: "Select a venue",
                 onbTitle: "Just a moment!", onbSub: "Fill in basic info so we can find you partners.", phName: "Your Name", phAge: "Your Age (Min. 18)", onbStart: "Let's go!",
                 onbSportOpt: "Favorite sport (Optional)", addPostTitle: "New post", addPostBtn: "Publish",
                 emailConfTitle: "Confirm your email", emailConfDesc: "We've sent a verification link to your address. Please check your inbox!", btnUnderstand: "I understand"
@@ -1430,21 +1431,15 @@
             }
         }
 
-        // 8. TABLICA POSTÓW I DODAWANIE Z BAZY
-        let postsDB = []; // Puste! Ładowane z Firestore
+        // 8. TABLICA POSTÓW I DODAWANIE
+        let postsDB = [
+            { id: 1, author: 'Kuba', avatar: 'https://i.pravatar.cc/150?img=11', time: '10 min temu', content: 'Szukamy bramkarza na orlika dzisiaj o 20:00! Hala Orbita.', sport: 'pilkanozna', city: 'Wrocław' },
+            { id: 2, author: 'Zosia', avatar: 'https://i.pravatar.cc/150?img=9', time: '1 godz. temu', content: 'Idę wieczorem pobiegać po parku, ktoś dołączy? Tempo ok. 5:30/km.', sport: 'bieganie', city: 'Wrocław' },
+            { id: 3, author: 'Kasia', avatar: 'https://i.pravatar.cc/150?img=20', time: '5 min temu', content: 'Ktoś chętny zagrać w padla na weekendzie? Znam fajny kort.', sport: 'padel', city: 'Warszawa' }
+        ];
+
         let pendingPostMedia = null;
         let pendingPostMediaType = null;
-
-        async function loadPostsFromDB() {
-            postsDB = [];
-            try {
-                const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, "posts"));
-                querySnapshot.forEach((doc) => {
-                    postsDB.push({ id: doc.id, ...doc.data() });
-                });
-                renderPosts();
-            } catch(e) { console.error("Error loading posts:", e); }
-        }
 
         function renderPosts() {
             const container = document.getElementById('postsContainer'); container.innerHTML = '';
@@ -1541,7 +1536,7 @@
         
         function closeAddPostModal() { const m = document.getElementById('addPostModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
         
-        async function submitNewPost() {
+        function submitNewPost() {
             const content = document.getElementById('newPostContent').value.trim();
             const sport = document.getElementById('newPostSportValue').value;
             const city = document.getElementById('newPostCity').value;
@@ -1549,19 +1544,21 @@
             
             if(!content || !sport || !city) { errEl.classList.remove('hidden'); return; }
             
-            const newPostData = { author: document.getElementById('inputName').value || 'Ty', avatar: document.getElementById('profileImage').src, time: 'Teraz', content: content, sport: sport, city: city, media: pendingPostMedia, mediaType: pendingPostMediaType };
-            try {
-                const docRef = await window.firestore.addDoc(window.firestore.collection(window.db, "posts"), newPostData);
-                postsDB.push({ id: docRef.id, ...newPostData });
-            } catch(e) { console.error("Błąd zapisywania", e); }
+            postsDB.push({ id: Date.now(), author: document.getElementById('inputName').value || 'Ty', avatar: document.getElementById('profileImage').src, time: 'Teraz', content: content, sport: sport, city: city, media: pendingPostMedia, mediaType: pendingPostMediaType });
             
             document.getElementById('postCityFilter').value = city; document.getElementById('postSportFilter').value = 'all';
             renderPosts(); closeAddPostModal();
         }
 
-        // 9. SWIPE I MATCH (Prawdziwe dane z bazy!)
+        // 9. SWIPE I MATCH
         let currentCards = []; let matches = []; let activeChatFilters = new Set();
-        
+        const profilesDB = [
+            { id: 1, name: 'Michał', age: 28, city: 'Wrocław', sport: 'bieganie', level: 'Średnio', bio: 'Biegam nad Odrą. Szukam kogoś na tempo 5:30/km.', img: 'https://i.pravatar.cc/400?img=12' },
+            { id: 2, name: 'Ania', age: 25, city: 'Wrocław', sport: 'bieganie', level: 'Początkujący', bio: 'Dopiero zaczynam, przygotowuję się do pierwszych 5km.', img: 'https://i.pravatar.cc/400?img=5' },
+            { id: 4, name: 'Kasia', age: 29, city: 'Wrocław', sport: 'tenis', level: 'Średnio', bio: 'Zazwyczaj gram w Hasta La Vista.', img: 'https://i.pravatar.cc/400?img=20' },
+            { id: 5, name: 'Piotrek', age: 24, city: 'Kraków', sport: 'silownia', level: 'Zaawansowany', bio: 'Szukam kogoś do asekuracji przy ciężkich siadach.', img: 'https://i.pravatar.cc/400?img=11' }
+        ];
+
         const screensApp = ['preferencesScreen', 'swipeScreen', 'messagesScreen', 'profileScreen', 'postsScreen'];
         function navTo(screenId, btnElement = null) {
             screensApp.forEach(s => { const el = document.getElementById(s); if(el) { el.classList.add('hidden'); el.classList.remove('fade-in'); } });
@@ -1577,31 +1574,14 @@
             navTo('swipeScreen'); startMatching(); 
         });
 
-        async function startMatching() {
+        function startMatching() {
             const cityName = document.getElementById('citySelect').options[document.getElementById('citySelect').selectedIndex].text;
             const sportObj = allSports.find(s=>s.id === selectedSport);
             document.getElementById('currentFilterText').innerHTML = `<i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>${cityName} • ${sportObj.emoji} ${sportObj.name}</span>`;
             
-            try {
-                const q = window.firestore.query(
-                    window.firestore.collection(window.db, "users"), 
-                    window.firestore.where("city", "==", selectedCity),
-                    window.firestore.where("sport", "==", selectedSport)
-                );
-                const querySnapshot = await window.firestore.getDocs(q);
-                let filtered = [];
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if(window.auth.currentUser && doc.id === window.auth.currentUser.uid) return; // Nie pokazuj siebie
-                    filtered.push({ id: doc.id, name: data.name, age: data.age, city: data.city, sport: data.sport, level: 'Początkujący', bio: data.bio, img: data.photo });
-                });
-                currentCards = filtered.sort(() => Math.random() - 0.5);
-                renderCards();
-            } catch(e) {
-                console.error("Błąd pobierania profili", e);
-                currentCards = [];
-                renderCards();
-            }
+            let filtered = profilesDB.filter(p => p.city.toLowerCase() === cityName.toLowerCase() && p.sport === selectedSport);
+            currentCards = [...filtered].sort(() => Math.random() - 0.5);
+            renderCards();
         }
 
         function renderCards() {
@@ -1643,7 +1623,14 @@
         }
 
         // 10. USTAWIENIA MODALE
-        function openSettings() { const m = document.getElementById('settingsModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10); }
+        function openSettings() { 
+            const user = window.auth ? window.auth.currentUser : null;
+            if(user) {
+                document.getElementById('settingsEmail').innerText = user.email || (currentLang === 'pl' ? 'Zalogowano przez Social Media' : 'Logged in via Social Media');
+            }
+            const m = document.getElementById('settingsModal'); 
+            m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10); 
+        }
         function closeSettings() { const m = document.getElementById('settingsModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
         function openTextModal(type) { const data = modalTexts[currentLang][type]; document.getElementById('textModalTitle').innerText = data.title; document.getElementById('textModalContent').innerHTML = data.content; document.getElementById('textModal').classList.remove('hidden'); setTimeout(() => document.getElementById('textModal').classList.remove('translate-y-full'), 10); }
         function closeTextModal() { document.getElementById('textModal').classList.add('translate-y-full'); setTimeout(() => document.getElementById('textModal').classList.add('hidden'), 300); }
@@ -1651,7 +1638,7 @@
         // 11. CZAT, BOT I MIEJSCÓWKI
         const chatScreen = document.getElementById('chatScreen'); const messagesContainer = document.getElementById('chatMessages'); const inputField = document.getElementById('chatInput');
         const defaultBotAvatar = 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff';
-        const apiKey = "AQ.Ab8RN6LB_FXTaFt7teQR6yNr--7zU3MshtYS7k3G0uYf8pl92w"; 
+        const apiKey = ""; 
 
         let allChatHistories = {
             'bot': { name: 'Trener Bot', img: defaultBotAvatar, messages: [{ role: 'model', parts: [{text: 'Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪'}]}] }
@@ -1665,7 +1652,7 @@
             const slider = document.getElementById('matchesList');
             const circle = document.createElement('div'); circle.className = 'flex flex-col items-center cursor-pointer fade-in';
             circle.onclick = () => openChat(profile.id, profile.name, profile.img);
-            circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${profile.img}" class="w-full h-full rounded-full object-cover"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300">${profile.name}</span>`;
+            circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${profile.img}" class="w-full h-full rounded-full object-cover bg-white"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300">${profile.name}</span>`;
             slider.appendChild(circle);
 
             const chatList = document.getElementById('chatsList');
