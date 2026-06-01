@@ -1063,8 +1063,47 @@
             }, 400);
         }
 
-        function proceedToApp() {
+        async function proceedToApp() {
             const loader = document.getElementById('loadingScreen'); loader.classList.remove('hidden');
+            
+            const user = window.auth ? window.auth.currentUser : null;
+            if (user && window.db && window.getDoc) {
+                try {
+                    const userDoc = await window.getDoc(window.doc(window.db, "users", user.uid));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        document.getElementById('displayName').innerText = data.name || 'Użytkownik';
+                        document.getElementById('inputName').value = data.name || '';
+                        document.getElementById('displayAge').innerText = data.age || '18';
+                        document.getElementById('inputAge').value = data.age || '';
+                        document.getElementById('displayCityText').innerText = data.city || 'Wrocław';
+                        document.getElementById('inputProfileCity').value = data.city || '';
+                        document.getElementById('postCityFilter').value = data.city || '';
+                        document.getElementById('newPostCity').value = data.city || '';
+                        
+                        if (data.interests) { userInterests = data.interests; renderProfileInterests(); }
+                        if (data.bio) {
+                            document.getElementById('inputBio').value = data.bio;
+                            document.getElementById('displayBio').innerText = data.bio;
+                            document.getElementById('displayBio').classList.remove('italic', 'text-gray-400');
+                        }
+
+                        setTimeout(() => {
+                            loader.classList.add('hidden');
+                            const loginScreen = document.getElementById('loginScreen');
+                            if(!loginScreen.classList.contains('hidden')) loginScreen.classList.add('hidden');
+                            document.getElementById('appContainer').classList.remove('hidden');
+                            document.getElementById('appContainer').classList.add('screen-enter-active');
+                            document.getElementById('preferencesScreen').classList.remove('hidden');
+                            setTimeout(() => { document.getElementById('appContainer').classList.remove('screen-enter-active'); renderPosts(); }, 500);
+                        }, 800);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Błąd ładowania profilu:", e);
+                }
+            }
+
             setTimeout(() => {
                 loader.classList.add('hidden');
                 const loginScreen = document.getElementById('loginScreen'); 
@@ -1077,7 +1116,7 @@
                 } else {
                     showOnboarding();
                 }
-            }, 1500); 
+            }, 1000); 
         }
 
         function performLogout() {
@@ -1156,7 +1195,7 @@
         });
         // --- Koniec autouzupełniania ---
 
-        function finishOnboarding() {
+        async function finishOnboarding() {
             const name = document.getElementById('onbName').value.trim();
             const age = document.getElementById('onbAge').value.trim();
             const city = document.getElementById('onbCity').value.trim();
@@ -1187,6 +1226,21 @@
                 renderProfileInterests();
             }
 
+            // Zapis do Firestore
+            const user = window.auth ? window.auth.currentUser : null;
+            if (user && window.db && window.setDoc) {
+                try {
+                    await window.setDoc(window.doc(window.db, "users", user.uid), {
+                        name: name,
+                        age: age,
+                        city: city,
+                        interests: userInterests,
+                        bio: "",
+                        email: user.email
+                    });
+                } catch (e) { console.error("Błąd zapisu:", e); }
+            }
+
             const onbScreen = document.getElementById('onboardingScreen'); onbScreen.classList.add('screen-exit-active');
             setTimeout(() => {
                 onbScreen.classList.add('hidden'); onbScreen.classList.remove('screen-exit-active');
@@ -1198,18 +1252,27 @@
 
         // 4. PROFIL
         function toggleEdit(field) { document.getElementById('view' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('hidden'); document.getElementById('edit' + field).classList.add('flex'); if(field === 'Bio') updateBioCounter(); }
-        function saveEdit(field) {
+        async function saveEdit(field) {
             document.getElementById('edit' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('flex'); document.getElementById('view' + field).classList.remove('hidden');
+            
+            const user = window.auth ? window.auth.currentUser : null;
+            let updateData = {};
+
             if(field === 'NameAge') { 
-                document.getElementById('displayName').innerText = document.getElementById('inputName').value; 
-                document.getElementById('displayAge').innerText = document.getElementById('inputAge').value; 
-                document.getElementById('displayCityText').innerText = document.getElementById('inputProfileCity').value; 
-                document.getElementById('postCityFilter').value = document.getElementById('inputProfileCity').value;
-                document.getElementById('newPostCity').value = document.getElementById('inputProfileCity').value;
+                const n = document.getElementById('inputName').value;
+                const a = document.getElementById('inputAge').value;
+                const c = document.getElementById('inputProfileCity').value;
+                document.getElementById('displayName').innerText = n; 
+                document.getElementById('displayAge').innerText = a; 
+                document.getElementById('displayCityText').innerText = c; 
+                document.getElementById('postCityFilter').value = c;
+                document.getElementById('newPostCity').value = c;
+                updateData = { name: n, age: a, city: c };
                 renderPosts(); 
             } 
             else if (field === 'Bio') { 
                 const bioVal = document.getElementById('inputBio').value;
+                updateData = { bio: bioVal };
                 const displayEl = document.getElementById('displayBio');
                 if(bioVal.trim() === '') {
                     displayEl.innerText = currentLang === 'pl' ? "Brak opisu." : "No description added yet.";
@@ -1218,6 +1281,11 @@
                     displayEl.innerText = bioVal;
                     displayEl.classList.remove('italic', 'text-gray-400');
                 }
+            }
+
+            if (user && window.db && window.setDoc && Object.keys(updateData).length > 0) {
+                try { await window.setDoc(window.doc(window.db, "users", user.uid), updateData, { merge: true }); } 
+                catch (e) { console.error("Błąd aktualizacji:", e); }
             }
         }
         function updateBioCounter() { const bioInput = document.getElementById('inputBio'); const counter = document.getElementById('bioCounter'); counter.innerText = `${bioInput.value.length}/150 znaków`; }
@@ -1344,7 +1412,14 @@
             }
         }
 
-        function removeProfileInterest(sportId) { userInterests = userInterests.filter(id => id !== sportId); renderProfileInterests(); }
+        async function updateInterestsInDB() {
+            const user = window.auth ? window.auth.currentUser : null;
+            if (user && window.db && window.setDoc) {
+                try { await window.setDoc(window.doc(window.db, "users", user.uid), { interests: userInterests }, { merge: true }); } catch(e){}
+            }
+        }
+
+        function removeProfileInterest(sportId) { userInterests = userInterests.filter(id => id !== sportId); renderProfileInterests(); updateInterestsInDB(); }
 
         function openInterestModal() {
             const m = document.getElementById('interestModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10);
@@ -1361,7 +1436,7 @@
                     btn.className = 'interest-item w-full text-left px-4 py-3 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-700 rounded-xl flex items-center hover:border-primary transition mb-1';
                     btn.dataset.name = sport.name.toLowerCase();
                     btn.innerHTML = `<span class="text-2xl mr-3">${sport.emoji}</span> <span class="font-medium text-gray-800 dark:text-white">${sport.name}</span>`;
-                    btn.onclick = () => { userInterests.push(sport.id); renderProfileInterests(); closeInterestModal(); };
+                    btn.onclick = () => { userInterests.push(sport.id); renderProfileInterests(); updateInterestsInDB(); closeInterestModal(); };
                     list.appendChild(btn);
                 }
             });
