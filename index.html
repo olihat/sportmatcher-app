@@ -1005,7 +1005,14 @@
             confScreen.classList.add('screen-exit-active');
             setTimeout(() => {
                 confScreen.classList.add('hidden'); confScreen.classList.remove('flex', 'screen-exit-active');
-                window.proceedToApp();
+                
+                // Cofnięcie do panelu logowania!
+                const loginScreen = document.getElementById('loginScreen');
+                loginScreen.classList.remove('hidden');
+                loginScreen.classList.add('screen-enter-active');
+                window.toggleAuthPanel('login');
+                
+                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
             }, 400);
         }
 
@@ -1094,23 +1101,8 @@
             setTimeout(() => {
                 appCont.classList.add('hidden'); appCont.classList.remove('screen-exit-active');
                 
-                document.getElementById('preferencesScreen').classList.add('hidden'); 
-                document.getElementById('postsScreen').classList.add('hidden'); 
-                document.getElementById('messagesScreen').classList.add('hidden'); 
-                document.getElementById('profileScreen').classList.add('hidden'); 
-                document.getElementById('swipeScreen').classList.add('hidden');
-                
-                const loginScreen = document.getElementById('loginScreen'); 
-                loginScreen.classList.remove('hidden'); loginScreen.classList.add('screen-enter-active');
-                toggleAuthPanel('login'); 
-                
-                document.getElementById('loginEmailInput').value = ''; 
-                document.getElementById('loginPassInput').value = ''; 
-                document.getElementById('regLoginInput').value = ''; 
-                document.getElementById('regEmailInput').value = ''; 
-                document.getElementById('regPassInput').value = '';
-                
-                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
+                // Odświeżamy stronę całkowicie (Najlepsze wyjście dla apek PWA - resetuje zacięcia i pamięć!)
+                location.reload();
             }, 400);
         };
 
