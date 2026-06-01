@@ -37,8 +37,12 @@
           signInWithPopup,
           deleteUser,
           EmailAuthProvider,
-          reauthenticateWithCredential
+          reauthenticateWithCredential,
+          signOut
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { 
+          getFirestore, doc, setDoc, getDoc, deleteDoc 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       
         // TWOJE PRAWDZIWE KLUCZE Z FIREBASE!
         const firebaseConfig = {
@@ -53,10 +57,17 @@
       
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
       
         // Udostępnianie instancji do obiektu window dla innych funkcji
         window.auth = auth;
+        window.db = db;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.doc = doc;
+        window.deleteDoc = deleteDoc;
+        window.signOut = signOut;
 
         window.realEmailRegister = (btn) => {
           const email = document.getElementById('regEmailInput').value.trim();
@@ -84,14 +95,17 @@
             .then((userCredential) => {
               sendEmailVerification(userCredential.user)
                 .then(() => {
-                  btn.innerHTML = origText;
-                  btn.disabled = false;
-                  document.getElementById('loginScreen').classList.add('hidden');
-                  const confScreen = document.getElementById('emailConfirmModal');
-                  if(confScreen) {
-                      confScreen.classList.remove('hidden');
-                      confScreen.classList.add('flex');
-                  }
+                  // Natychmiastowe wylogowanie - wymusza potwierdzenie e-mail!
+                  signOut(auth).then(() => {
+                      btn.innerHTML = origText;
+                      btn.disabled = false;
+                      document.getElementById('loginScreen').classList.add('hidden');
+                      const confScreen = document.getElementById('emailConfirmModal');
+                      if(confScreen) {
+                          confScreen.classList.remove('hidden');
+                          confScreen.classList.add('flex');
+                      }
+                  });
                 });
             })
             .catch((error) => {
@@ -128,6 +142,7 @@
               btn.innerHTML = origText;
               btn.disabled = false;
               if (!userCredential.user.emailVerified) {
+                  signOut(auth); // Zabezpieczenie przed tłem
                   errEl.innerText = currentLang === 'pl' ? "Najpierw potwierdź adres e-mail!" : "Confirm your email first!";
                   errEl.classList.remove('hidden');
                   return;
@@ -148,7 +163,11 @@
             });
         };
 
-        window.realGoogleLogin = () => {
+        window.realGoogleLogin = (btn) => {
+          const origText = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+          btn.disabled = true;
+
           signInWithPopup(auth, googleProvider)
             .then((result) => {
               if(typeof window.proceedToApp === 'function') {
@@ -156,7 +175,10 @@
               }
             })
             .catch((error) => {
-              alert("Błąd logowania Google: " + error.message);
+              setTimeout(() => {
+                  btn.innerHTML = origText;
+                  btn.disabled = false;
+              }, 1000); // Odblokowanie po sekundzie przy anulowaniu
             });
         };
 
@@ -164,7 +186,6 @@
             const user = auth.currentUser;
             if(!user) return;
             
-            // Ukryj/pokaż pole na hasło w zależności od metody logowania
             const passContainer = document.getElementById('deletePassContainer');
             if (user.providerData.some(p => p.providerId === 'password')) {
                 passContainer.classList.remove('hidden');
@@ -195,10 +216,13 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
             btn.disabled = true;
 
+            const uid = user.uid;
+
             if(user.providerData.some(p => p.providerId === 'password')) {
                 const credential = EmailAuthProvider.credential(user.email, pass);
                 reauthenticateWithCredential(user, credential).then(() => {
                     deleteUser(user).then(() => {
+                        window.deleteDoc(window.doc(window.db, "users", uid)).catch(e => console.log(e));
                         closeDeleteAccountModal();
                         if(typeof window.performLogout === 'function') window.performLogout();
                     }).catch(err => {
@@ -209,6 +233,7 @@
                 });
             } else {
                 deleteUser(user).then(() => {
+                    window.deleteDoc(window.doc(window.db, "users", uid)).catch(e => console.log(e));
                     closeDeleteAccountModal();
                     if(typeof window.performLogout === 'function') window.performLogout();
                 }).catch(err => {
@@ -320,7 +345,7 @@
                             <button class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-apple text-xl mr-3 mb-1"></i><span class="font-semibold text-sm" data-i18n="logApple">Kontynuuj przez Apple</span>
                             </button>
-                            <button onclick="realGoogleLogin()" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button onclick="realGoogleLogin(this)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                 <span class="font-semibold text-sm" data-i18n="logGoogle">Kontynuuj przez Google</span>
                             </button>
@@ -820,10 +845,7 @@
                             </div>
                             <div class="px-4 py-3 flex justify-between items-center">
                                 <span class="font-medium text-gray-700 dark:text-gray-200" data-i18n="setPass">Hasło</span>
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-lg text-gray-400 translate-y-1">••••••••</span>
-                                    <button onclick="resetPasswordInfo()" class="text-primary hover:text-primaryHover transition"><i class="fas fa-eye-slash"></i></button>
-                                </div>
+                                <span class="text-lg text-gray-400 tracking-widest translate-y-1">••••••••</span>
                             </div>
                         </div>
                     </div>
@@ -1058,7 +1080,18 @@
             confScreen.classList.add('screen-exit-active');
             setTimeout(() => {
                 confScreen.classList.add('hidden'); confScreen.classList.remove('flex', 'screen-exit-active');
-                proceedToApp();
+                
+                // POWRÓT DO LOGOWANIA ZE SKASOWANYMI DANYMI (BEZWZGLĘDNA WERYFIKACJA)
+                const loginScreen = document.getElementById('loginScreen');
+                loginScreen.classList.remove('hidden');
+                loginScreen.classList.add('screen-enter-active');
+                toggleAuthPanel('login');
+                
+                document.getElementById('regEmailInput').value = '';
+                document.getElementById('regPassInput').value = '';
+                document.getElementById('regPassConfirmInput').value = '';
+                
+                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
             }, 400);
         }
 
@@ -1119,6 +1152,9 @@
         }
 
         function performLogout() {
+            if (window.auth && window.signOut) {
+                window.signOut(window.auth);
+            }
             closeSettings(); 
             const appCont = document.getElementById('appContainer'); appCont.classList.add('screen-exit-active');
             setTimeout(() => {
