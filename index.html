@@ -1010,21 +1010,14 @@
         }
 
         window.proceedToApp = async () => {
-            const loader = document.getElementById('loadingScreen'); 
-            loader.classList.remove('hidden');
-
             const user = window.auth ? window.auth.currentUser : null;
-            if(!user) {
-                loader.classList.add('hidden');
-                return;
-            }
+            if(!user) return;
 
             try {
                 // Sprawdzamy, czy ten użytkownik zakładał już kiedyś u nas profil (w bazie)
                 const userDocRef = window.firestore.doc(window.db, "users", user.uid);
                 const userDocSnap = await window.firestore.getDoc(userDocRef);
                 
-                loader.classList.add('hidden');
                 const loginScreen = document.getElementById('loginScreen'); 
                 
                 if(loginScreen && !loginScreen.classList.contains('hidden')) {
@@ -1090,10 +1083,17 @@
         };
 
         window.performLogout = () => {
+            const appCont = document.getElementById('appContainer'); 
+            // Zabezpieczenie przed podwójnym kliknięciem / podwójną animacją
+            if(appCont.classList.contains('screen-exit-active') || appCont.classList.contains('hidden')) return;
+
+            if(window.auth) window.auth.signOut(); // Faktyczne wylogowanie z sesji Firebase
             closeSettings(); 
-            const appCont = document.getElementById('appContainer'); appCont.classList.add('screen-exit-active');
+            
+            appCont.classList.add('screen-exit-active');
             setTimeout(() => {
                 appCont.classList.add('hidden'); appCont.classList.remove('screen-exit-active');
+                
                 document.getElementById('preferencesScreen').classList.add('hidden'); 
                 document.getElementById('postsScreen').classList.add('hidden'); 
                 document.getElementById('messagesScreen').classList.add('hidden'); 
@@ -1109,6 +1109,7 @@
                 document.getElementById('regLoginInput').value = ''; 
                 document.getElementById('regEmailInput').value = ''; 
                 document.getElementById('regPassInput').value = '';
+                
                 setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
             }, 400);
         };
