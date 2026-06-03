@@ -1711,7 +1711,7 @@
         // 11. CZAT, BOT I MIEJSCÓWKI
         const chatScreen = document.getElementById('chatScreen'); const messagesContainer = document.getElementById('chatMessages'); const inputField = document.getElementById('chatInput');
         const defaultBotAvatar = 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff';
-        const apiKey = "AQ.Ab8RN6LB_FXTaFt7teQR6yNr--7zU3MshtYS7k3G0uYf8pl92w";
+        const apiKey = "AQ.Ab8RN6LkMLLiAwvT6JYNeV2uysUsXRvccVddyOGIuz3sGQPsjQ"; 
 
         // NOWY STAN CZATÓW
         let blockedUsers = new Set();
@@ -1893,69 +1893,146 @@ Poza tym krótko motywuj do treningu.`;
 
         window.openChat = (id, name = 'Trener Bot', img = defaultBotAvatar) => {
             currentChatId = id;
-            if(!allChatHistories[id]) { allChatHistories[id] = { id: id, name: name, img: img, sport: selectedSport, messages: [{ role: 'model', parts: [{text: `Hej! Kiedy trening?`}] }] }; }
-            document.getElementById('chatHeaderName').innerHTML = `${name} ${id === 'bot' ? '<i class="fas fa-check-circle text-primary text-xs ml-1"></i>' : ''}`;
+            if(!allChatHistories[id]) { 
+                allChatHistories[id] = { id: id, name: name, img: img, sport: 'bot', messages: [{ role: 'model', parts: [{text: `Hej! Dzięki za match! Kiedy lecimy na trening?`}] }] }; 
+            }
+            
+            document.getElementById('chatHeaderName').innerText = name;
+            const icon = document.getElementById('chatHeaderIcon');
+            if (icon) {
+                icon.className = id === 'bot' ? 'fas fa-robot text-gray-400 ml-1' : 'fas fa-check-circle text-primary text-xs ml-1';
+                icon.classList.remove('hidden');
+            }
             document.getElementById('chatHeaderImg').src = img;
             document.getElementById('chatHeaderStatus').innerText = id === 'bot' ? (currentLang === 'pl' ? 'Zawsze aktywny' : 'Always active') : (currentLang === 'pl' ? 'Teraz online' : 'Online now');
+            
             window.renderCurrentChat();
-            chatScreen.classList.remove('hidden'); requestAnimationFrame(() => chatScreen.classList.remove('translate-x-full')); window.scrollToBottom();
-        }
-        window.closeChat = () => { chatScreen.classList.add('translate-x-full'); setTimeout(() => chatScreen.classList.add('hidden'), 300); }
-        window.handleChatEnter = (e) => { if (e.key === 'Enter') window.sendMessage(); }
-        window.scrollToBottom = () => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
+            
+            const chatScreen = document.getElementById('chatScreen');
+            chatScreen.classList.remove('hidden'); 
+            requestAnimationFrame(() => chatScreen.classList.remove('translate-x-full')); 
+            window.scrollToBottom();
+        };
+
+        window.closeChat = () => {
+            const chatScreen = document.getElementById('chatScreen');
+            chatScreen.classList.add('translate-x-full'); 
+            setTimeout(() => chatScreen.classList.add('hidden'), 300);
+        };
+
+        window.handleChatEnter = (e) => { 
+            if (e.key === 'Enter') window.sendMessage(); 
+        };
+
+        window.scrollToBottom = () => { 
+            const messagesContainer = document.getElementById('chatMessages');
+            if(messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight; 
+            }
+        };
 
         window.renderCurrentChat = () => {
-            messagesContainer.innerHTML = '<div class="text-center my-4"><span class="text-xs text-gray-400 font-medium bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-full">Dziś</span></div>';
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.innerHTML = '<div class="text-center my-4"><span class="text-xs text-gray-400 font-medium bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-full" data-i18n="chatToday">Dziś</span></div>';
             const history = allChatHistories[currentChatId].messages;
-            history.forEach(msg => { const isUser = msg.role === 'user'; window.appendMessageUI(msg.parts[0].text, isUser, isUser ? '' : allChatHistories[currentChatId].img); });
-        }
+            history.forEach(msg => { 
+                const isUser = msg.role === 'user'; 
+                window.appendMessageUI(msg.parts[0].text, isUser, isUser ? '' : allChatHistories[currentChatId].img); 
+            });
+        };
 
         window.appendMessageUI = (text, isUser = true, avatarUrl = '') => {
-            const wrapper = document.createElement('div'); wrapper.className = `flex ${isUser ? 'justify-end' : 'items-end space-x-2'} mb-4 fade-in`;
+            const messagesContainer = document.getElementById('chatMessages');
+            const wrapper = document.createElement('div'); 
+            wrapper.className = `flex ${isUser ? 'justify-end' : 'items-end space-x-2'} mb-4 fade-in`;
             let html = !isUser ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white">` : '';
             html += `<div class="${isUser ? 'bg-primary text-white rounded-2xl rounded-br-none' : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-bl-none shadow-sm'} px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap">${text}</div>`;
-            wrapper.innerHTML = html; messagesContainer.appendChild(wrapper); window.scrollToBottom();
-            const previewEl = document.getElementById(`preview-msg-${currentChatId}`); if(previewEl) previewEl.innerText = isUser ? `Ty: ${text.substring(0,15)}...` : text.substring(0,15)+'...';
-        }
+            wrapper.innerHTML = html; 
+            messagesContainer.appendChild(wrapper); 
+            window.scrollToBottom();
+            
+            const previewEl = document.getElementById(`preview-msg-${currentChatId}`); 
+            if(previewEl) previewEl.innerText = isUser ? `Ty: ${text.substring(0,15)}...` : text.substring(0,15)+'...';
+        };
 
         window.showTypingIndicator = () => {
-            const wrapper = document.createElement('div'); wrapper.id = 'typingIndicator'; wrapper.className = `flex items-end space-x-2 mb-4 fade-in`;
+            const messagesContainer = document.getElementById('chatMessages');
+            const wrapper = document.createElement('div'); 
+            wrapper.id = 'typingIndicator'; 
+            wrapper.className = `flex items-end space-x-2 mb-4 fade-in`;
             wrapper.innerHTML = `<img src="${allChatHistories[currentChatId].img}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white"><div class="bg-white border border-gray-100 dark:bg-gray-800 dark:border-gray-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex space-x-1"><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div></div>`;
-            messagesContainer.appendChild(wrapper); window.scrollToBottom();
-        }
+            messagesContainer.appendChild(wrapper); 
+            window.scrollToBottom();
+        };
 
-        async function fetchWithRetry(url, options, retries = 5) {
-            let delay = 1000; for (let i = 0; i < retries; i++) { try { const response = await fetch(url, options); if (response.ok) return await response.json(); } catch (err) { if (i === retries - 1) throw err; } await new Promise(res => setTimeout(res, delay)); delay *= 2; } throw new Error("API błąd");
-        }
+        window.removeTypingIndicator = () => {
+            const ind = document.getElementById('typingIndicator');
+            if (ind) ind.remove();
+        };
+
+        window.fetchWithRetry = async (url, options, retries = 3) => {
+            let delay = 1000; 
+            for (let i = 0; i < retries; i++) { 
+                try { 
+                    const response = await fetch(url, options); 
+                    if (response.ok) return await response.json(); 
+                    // Obsługa specyficznego błędu API Google
+                    if (response.status === 400 || response.status === 403) {
+                        const err = await response.json();
+                        throw new Error(err.error?.message || "Nieprawidłowy klucz API.");
+                    }
+                } catch (err) { 
+                    if (i === retries - 1) throw err; 
+                } 
+                await new Promise(res => setTimeout(res, delay)); delay *= 2; 
+            } 
+            throw new Error("Błąd połączenia z serwerem.");
+        };
 
         window.triggerBotResponse = async () => {
             window.showTypingIndicator();
-            // USUNIĘTO BLOKADĘ KLUCZY ZACZYNAJĄCYCH SIĘ OD "AQ." !
+            
+            // Usunąłem sprawdzanie "AIzaSy", sprawdzam tylko czy klucz nie jest pusty lub testowy.
             if (!apiKey || apiKey.includes("TUTAJ_WKLEJ")) {
                 setTimeout(() => { 
-                    document.getElementById('typingIndicator')?.remove(); 
+                    window.removeTypingIndicator(); 
                     let reply = "";
                     if(currentChatId === 'bot') {
-                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 (Wklej poprawny klucz API, abym mógł wygenerować dla Ciebie prawdziwy plan treningowy!)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
-                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi! (Podepnij klucz API by ożywić bota)`; }
+                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga klucza API, aby ułożyć prawdziwy plan)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
+                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi!`; }
                     window.appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
                     allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: reply }] }); 
                 }, 1000); return;
             }
             try {
-                const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: allChatHistories[currentChatId].messages, systemInstruction: { parts: [{ text: getSystemPrompt() }] } }) });
-                document.getElementById('typingIndicator')?.remove();
+                // Bezpośrednie i twarde połączenie z API Gemini!
+                const data = await window.fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        contents: allChatHistories[currentChatId].messages, 
+                        systemInstruction: { parts: [{ text: getSystemPrompt() }] } 
+                    }) 
+                });
+                
+                window.removeTypingIndicator();
                 const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd sieci.";
-                window.appendMessageUI(botReply, false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
-            } catch (error) { document.getElementById('typingIndicator')?.remove(); window.appendMessageUI("Błąd serwera. Sprawdź klucz API.", false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.pop(); }
-        }
+                window.appendMessageUI(botReply, false, allChatHistories[currentChatId].img); 
+                allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
+            } catch (error) { 
+                window.removeTypingIndicator(); 
+                // Bezpośrednie przekazanie informacji o błędzie do UI czatu
+                window.appendMessageUI("Błąd Google: " + error.message, false, allChatHistories[currentChatId].img); 
+                allChatHistories[currentChatId].messages.pop(); 
+            }
+        };
 
         window.sendMessage = async () => {
             const text = inputField.value.trim(); if (!text) return;
             inputField.value = ''; inputField.focus(); window.appendMessageUI(text, true); 
             allChatHistories[currentChatId].messages.push({ role: "user", parts: [{ text }] });
             window.triggerBotResponse();
-        }
+        };
     </script>
 </body>
 </html>
