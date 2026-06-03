@@ -3,7 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA / NATIVE APP META TAGS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#166534" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=SM&background=22c55e&color=fff&size=512">
+
     <title>Sport Matcher</title>
+    <link rel="manifest" href="manifest.json">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         if (window.tailwind) {
@@ -12,11 +23,11 @@
                 theme: {
                     extend: {
                         colors: {
-                            darkbg: '#064e3b',
-                            darkcard: '#065f46', 
-                            primary: '#22c55e', 
+                            darkbg: '#14532d', /* Trawiasty zielony ciemny */
+                            darkcard: '#166534', 
+                            primary: '#22c55e',
                             primaryHover: '#16a34a',
-                            accent: '#f97316' 
+                            accent: '#f97316'
                         }
                     }
                 }
@@ -34,6 +45,7 @@
           signInWithEmailAndPassword,
           sendEmailVerification,
           GoogleAuthProvider,
+          FacebookAuthProvider,
           signInWithPopup,
           deleteUser,
           EmailAuthProvider,
@@ -44,8 +56,9 @@
           getFirestore, doc, setDoc, getDoc, deleteDoc 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       
+        // TWOJE PRAWDZIWE KLUCZE Z FIREBASE!
         const firebaseConfig = {
-          apiKey: "AQ.Ab8RN6LB_FXTaFt7teQR6yNr--7zU3MshtYS7k3G0uYf8pl92w",
+          apiKey: "AIzaSyAM6U506cQ3OqXQWqNFRTSRECRZdY0fNNE",
           authDomain: "sport-matcher.firebaseapp.com",
           projectId: "sport-matcher",
           storageBucket: "sport-matcher.firebasestorage.app",
@@ -58,7 +71,9 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
+        const facebookProvider = new FacebookAuthProvider();
       
+        // Udostępnianie instancji do obiektu window dla innych funkcji
         window.auth = auth;
         window.db = db;
         window.getDoc = getDoc;
@@ -72,19 +87,22 @@
           const pass = document.getElementById('regPassInput').value.trim();
           const passConfirm = document.getElementById('regPassConfirmInput').value.trim();
           const errEl = document.getElementById('regError');
-          const termsCb = document.getElementById('regTermsCheckbox');
-          const privCb = document.getElementById('regPrivacyCheckbox');
+          
+          const termsChecked = document.getElementById('regTermsCheckbox').checked;
+          const privChecked = document.getElementById('regPrivacyCheckbox').checked;
       
           if(!email || !pass || !passConfirm) { 
               errEl.innerText = currentLang === 'pl' ? "Uzupełnij wszystkie dane!" : "Fill all fields!";
               errEl.classList.remove('hidden'); 
               return; 
           }
-          if(!termsCb.checked || !privCb.checked) {
-              errEl.innerText = currentLang === 'pl' ? "Musisz zaakceptować zgody prawne!" : "You must accept legal terms!";
+
+          if(!termsChecked || !privChecked) {
+              errEl.innerText = currentLang === 'pl' ? "Zaakceptuj Regulamin i Politykę Prywatności!" : "Accept Terms and Privacy Policy!";
               errEl.classList.remove('hidden'); 
               return;
           }
+
           if(pass !== passConfirm) {
               errEl.innerText = currentLang === 'pl' ? "Hasła nie są identyczne!" : "Passwords do not match!";
               errEl.classList.remove('hidden'); 
@@ -99,6 +117,7 @@
             .then((userCredential) => {
               sendEmailVerification(userCredential.user)
                 .then(() => {
+                  // Natychmiastowe wylogowanie - wymusza potwierdzenie e-mail!
                   signOut(auth).then(() => {
                       btn.innerHTML = origText;
                       btn.disabled = false;
@@ -145,7 +164,7 @@
               btn.innerHTML = origText;
               btn.disabled = false;
               if (!userCredential.user.emailVerified) {
-                  signOut(auth);
+                  signOut(auth); // Zabezpieczenie przed tłem
                   errEl.innerText = currentLang === 'pl' ? "Najpierw potwierdź adres e-mail!" : "Confirm your email first!";
                   errEl.classList.remove('hidden');
                   return;
@@ -182,6 +201,34 @@
                   btn.innerHTML = origText;
                   btn.disabled = false;
               }, 1000); 
+              if (error.code !== 'auth/popup-closed-by-user') {
+                  window.showToast("Błąd logowania Google", "error");
+              }
+            });
+        };
+
+        window.realFacebookLogin = (btn) => {
+          const origText = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
+          btn.disabled = true;
+
+          signInWithPopup(auth, facebookProvider)
+            .then((result) => {
+              if(typeof window.proceedToApp === 'function') {
+                  window.proceedToApp();
+              }
+            })
+            .catch((error) => {
+              setTimeout(() => {
+                  btn.innerHTML = origText;
+                  btn.disabled = false;
+              }, 1000);
+              
+              if (error.code === 'auth/account-exists-with-different-credential') {
+                  window.showToast("Zaloguj się przez Google (ten e-mail jest już zajęty)!", "error");
+              } else if (error.code !== 'auth/popup-closed-by-user') {
+                  window.showToast("Błąd logowania FB", "error");
+              }
             });
         };
 
@@ -199,6 +246,7 @@
             document.getElementById('deleteAccountModal').classList.remove('hidden');
             document.getElementById('deleteAccountModal').classList.add('flex');
             document.getElementById('deletePassInput').value = '';
+            document.getElementById('deleteError').classList.add('hidden');
         };
 
         window.closeDeleteAccountModal = () => {
@@ -208,10 +256,11 @@
 
         window.confirmDeleteAccount = (btn) => {
             const pass = document.getElementById('deletePassInput').value.trim();
+            const errEl = document.getElementById('deleteError');
             const user = auth.currentUser;
 
-            if(!user) { window.showToast("Błąd: Brak zalogowanego użytkownika.", "error"); return; }
-            if(!pass && user.providerData.some(p => p.providerId === 'password')) { window.showToast("Podaj hasło!", "error"); return; }
+            if(!user) { errEl.innerText = "Błąd: Brak zalogowanego użytkownika."; errEl.classList.remove('hidden'); return; }
+            if(!pass && user.providerData.some(p => p.providerId === 'password')) { errEl.innerText = "Podaj hasło!"; errEl.classList.remove('hidden'); return; }
 
             const origText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i>';
@@ -225,22 +274,24 @@
                     deleteUser(user).then(() => {
                         window.deleteDoc(window.doc(window.db, "users", uid)).catch(e => console.log(e));
                         closeDeleteAccountModal();
+                        window.showToast("Konto zostało pomyślnie usunięte.", "success");
                         if(typeof window.performLogout === 'function') window.performLogout();
                     }).catch(err => {
-                        window.showToast("Błąd usuwania: " + err.message, "error"); btn.innerHTML = origText; btn.disabled = false;
+                        errEl.innerText = "Błąd usuwania: " + err.message; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                     });
                 }).catch(err => {
-                    window.showToast("Podano błędne hasło!", "error"); btn.innerHTML = origText; btn.disabled = false;
+                    errEl.innerText = "Podano błędne hasło!"; errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                 });
             } else {
                 deleteUser(user).then(() => {
                     window.deleteDoc(window.doc(window.db, "users", uid)).catch(e => console.log(e));
                     closeDeleteAccountModal();
+                    window.showToast("Konto zostało usunięte.", "success");
                     if(typeof window.performLogout === 'function') window.performLogout();
                 }).catch(err => {
-                    if(err.code === 'auth/requires-recent-login') window.showToast("Wyloguj i zaloguj się ponownie (Google), by móc usunąć konto.", "error");
-                    else window.showToast("Błąd: " + err.message, "error");
-                    btn.innerHTML = origText; btn.disabled = false;
+                    if(err.code === 'auth/requires-recent-login') errEl.innerText = "Wyloguj i zaloguj się ponownie (Google), by móc usunąć konto.";
+                    else errEl.innerText = "Błąd: " + err.message;
+                    errEl.classList.remove('hidden'); btn.innerHTML = origText; btn.disabled = false;
                 });
             }
         };
@@ -285,23 +336,22 @@
             .mobile-simulator { height: 850px; margin-top: 2rem; margin-bottom: 2rem; border-radius: 2.5rem; border: 8px solid #1f2937; }
         }
 
-        /* Styl dla toastów */
-        #toast-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 11000; pointer-events: none; width: 90%; max-width: 350px; }
-        .toast { display: flex; align-items: center; padding: 12px 16px; border-radius: 12px; margin-bottom: 10px; color: white; font-weight: bold; font-size: 14px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); animation: fadeInDown 0.3s ease-out forwards; }
-        .toast.success { background-color: #22c55e; }
-        .toast.error { background-color: #ef4444; }
-        .toast.info { background-color: #3b82f6; }
-        .toast-exit { animation: fadeOutUp 0.3s ease-in forwards; }
-        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeOutUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
+        /* Stylizacja tostów (powiadomień) */
+        #toastContainer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; flex-direction: column; align-items: center; pointer-events: none; width: 90%; }
+        .toast-msg { padding: 12px 20px; border-radius: 12px; color: white; font-weight: bold; font-size: 14px; margin-bottom: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); animation: toastEnter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; text-align: center; }
+        .toast-success { background: linear-gradient(to right, #22c55e, #16a34a); }
+        .toast-error { background: linear-gradient(to right, #ef4444, #dc2626); }
+        .toast-info { background: linear-gradient(to right, #3b82f6, #2563eb); }
+        @keyframes toastEnter { 0% { opacity: 0; transform: translateY(-20px) scale(0.9); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes toastExit { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.9) translateY(-10px); } }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen transition-colors duration-300">
 
     <div class="mobile-simulator w-full flex flex-col bg-white dark:bg-darkbg transition-colors duration-300">
 
-        <!-- Kontener na Toasty -->
-        <div id="toast-container" class="safe-top"></div>
+        <!-- KONTENER NA TOASTY -->
+        <div id="toastContainer"></div>
 
         <!-- 1. SPLASH SCREEN -->
         <div id="splashScreen" class="absolute inset-0 z-[10000] bg-white dark:bg-darkbg flex flex-col items-center justify-center transition-opacity duration-300">
@@ -313,7 +363,7 @@
 
         <!-- 2. EKRAN ŁADOWANIA -->
         <div id="loadingScreen" class="absolute inset-0 z-[9999] bg-white dark:bg-darkbg flex flex-col items-center justify-center hidden">
-            <div class="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <div class="w-16 h-16 border-4 border-gray-200 border-t-primary rounded-full animate-spin"></div>
         </div>
 
         <!-- 3. EKRAN LOGOWANIA / REJESTRACJI -->
@@ -340,14 +390,14 @@
                         <p class="text-gray-500 dark:text-gray-400 font-medium mb-6 text-center" data-i18n="loginSub">Zaloguj się, aby zagrać.</p>
                         
                         <div class="w-full space-y-3 mb-6">
-                            <button class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button class="w-full h-12 bg-black text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition opacity-50 cursor-not-allowed">
                                 <i class="fab fa-apple text-xl mr-3 mb-1"></i><span class="font-semibold text-sm" data-i18n="logApple">Kontynuuj przez Apple</span>
                             </button>
                             <button onclick="realGoogleLogin(this)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                 <span class="font-semibold text-sm" data-i18n="logGoogle">Kontynuuj przez Google</span>
                             </button>
-                            <button class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
+                            <button onclick="realFacebookLogin(this)" class="w-full h-12 bg-[#1877F2] text-white rounded-xl flex items-center justify-center px-6 active:scale-95 transition">
                                 <i class="fab fa-facebook-f text-lg mr-3"></i><span class="font-semibold text-sm" data-i18n="logFB">Kontynuuj przez Facebook</span>
                             </button>
                         </div>
@@ -374,13 +424,13 @@
                             </button>
                         </div>
                         
-                        <div class="text-center mt-auto pb-4">
-                            <span class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="noAccount">Nie masz konta?</span>
-                            <button onclick="toggleAuthPanel('register')" class="ml-1 font-bold text-primary active:text-primaryHover text-sm" data-i18n="registerBtn">Zarejestruj się</button>
+                        <div class="text-center mt-auto pb-4 flex flex-col items-center">
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="noAccount">Nie masz konta?</span>
+                                <button onclick="toggleAuthPanel('register')" class="ml-1 font-bold text-primary active:text-primaryHover text-sm" data-i18n="registerBtn">Zarejestruj się</button>
+                            </div>
+                            <button onclick="testBypassLogin()" class="mt-4 px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-full text-xs font-bold hover:bg-gray-300 transition">Testowy Skrót 🚀</button>
                         </div>
-                        
-                        <!-- Tymczasowy przycisk testowy -->
-                        <button onclick="simulateTestLogin()" class="w-full h-10 bg-gray-200 text-gray-600 font-bold rounded-xl mt-2 text-xs opacity-50 hover:opacity-100">TESTOWY SKRÓT</button>
                     </div>
 
                     <!-- PANEL REJESTRACJI -->
@@ -394,25 +444,23 @@
                             </div>
                             <div class="relative">
                                 <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                <input type="password" id="regPassInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPass" placeholder="Hasło (min. 6 znaków)">
+                                <input type="password" id="regPassInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPass" placeholder="Hasło">
                             </div>
                             <div class="relative">
                                 <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                 <input type="password" id="regPassConfirmInput" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phPassConfirm" placeholder="Powtórz hasło">
                             </div>
-                            
-                            <!-- CHECKBOXY ZGÓD -->
-                            <div class="space-y-2 mt-2">
-                                <label class="flex items-start space-x-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
-                                    <input type="checkbox" id="regTermsCheckbox" class="mt-0.5 rounded text-primary focus:ring-primary h-4 w-4">
-                                    <span>Akceptuję <button onclick="openTextModal('terms')" class="text-primary hover:underline font-bold" type="button">Regulamin</button> świadczenia usług.</span>
-                                </label>
-                                <label class="flex items-start space-x-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
-                                    <input type="checkbox" id="regPrivacyCheckbox" class="mt-0.5 rounded text-primary focus:ring-primary h-4 w-4">
-                                    <span>Zgadzam się z <button onclick="openTextModal('privacy')" class="text-primary hover:underline font-bold" type="button">Polityką Prywatności</button>.</span>
-                                </label>
+
+                            <!-- PRAWNE CHECKBOXY -->
+                            <div class="flex items-start space-x-3 text-xs mt-2 px-1">
+                                <input type="checkbox" id="regTermsCheckbox" class="w-4 h-4 mt-0.5 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="regTermsCheckbox" class="text-gray-600 dark:text-gray-400 font-medium">Akceptuję <button onclick="openTextModal('terms')" class="text-primary font-bold hover:underline">Regulamin</button> świadczenia usług.</label>
                             </div>
-                            
+                            <div class="flex items-start space-x-3 text-xs px-1">
+                                <input type="checkbox" id="regPrivacyCheckbox" class="w-4 h-4 mt-0.5 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="regPrivacyCheckbox" class="text-gray-600 dark:text-gray-400 font-medium">Zapoznałem się z <button onclick="openTextModal('privacy')" class="text-primary font-bold hover:underline">Polityką Prywatności</button> i zgadzam się na przetwarzanie danych.</label>
+                            </div>
+
                             <p id="regError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
                         </div>
 
@@ -429,31 +477,31 @@
             </div>
         </div>
 
-        <!-- 3.1 EKRAN POTWIERDZENIA E-MAIL (PO REJESTRACJI) -->
-        <div id="emailConfirmModal" class="absolute inset-0 z-[9500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden items-center justify-center text-center transition-colors duration-300">
-            <div class="w-24 h-24 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mb-6">
-                <i class="fas fa-envelope-open-text text-5xl"></i>
+        <!-- EKRAN POTWIERDZENIA E-MAIL -->
+        <div id="emailConfirmModal" class="absolute inset-0 z-[9500] bg-slate-900/80 hidden flex-col items-center justify-center p-6 fade-in">
+            <div class="bg-white dark:bg-darkcard rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+                <div class="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-envelope-open-text text-4xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
+                <p class="text-gray-600 dark:text-gray-400 text-sm mb-8" data-i18n="emailConfDesc">Wysłaliśmy link aktywacyjny na Twój adres. Kliknij go, a następnie zaloguj się do aplikacji!</p>
+                <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
+                    Rozumiem
+                </button>
             </div>
-            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3" data-i18n="emailConfTitle">Potwierdź e-mail</h2>
-            <p class="text-gray-500 dark:text-gray-400 mb-10" data-i18n="emailConfDesc">Na podany przez Ciebie adres wysłaliśmy link weryfikacyjny. Sprawdź skrzynkę odbiorczą (również folder SPAM)!</p>
-            <button onclick="closeEmailConfirmAndContinue()" class="w-full h-14 bg-primary hover:bg-primaryHover text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center" data-i18n="btnUnderstand">
-                Rozumiem
-            </button>
         </div>
 
-        <!-- 3.5 EKRAN ONBOARDINGU (Wiek 18+ i Miasto) -->
+        <!-- EKRAN ONBOARDINGU -->
         <div id="onboardingScreen" class="absolute inset-0 z-[8500] bg-white dark:bg-darkbg flex flex-col p-8 safe-top safe-bottom hidden overflow-hidden transition-colors duration-300">
             <div class="flex flex-col items-center mt-4 mb-8">
-                <div class="w-20 h-20 mb-3 drop-shadow-md">
-                    <img src="MainLogoSportMatcher.png" class="w-full h-full object-contain rounded-2xl">
-                </div>
-                <h1 class="text-3xl font-black tracking-widest text-slate-900 dark:text-white mb-1">SPORT<span class="text-primary">MATCHER</span></h1>
+                <div class="w-16 h-16 mb-3 drop-shadow-md" id="onboardingLogoContainer"></div>
+                <h1 class="text-2xl font-black tracking-widest text-slate-900 dark:text-white mb-1">SPORT<span class="text-primary">MATCHER</span></h1>
             </div>
             
             <div class="flex-1 w-full flex flex-col justify-center">
                 <p class="text-gray-500 dark:text-gray-400 font-medium mb-6 text-center" data-i18n="onbSub">Wypełnij podstawowe dane, abyśmy mogli znaleźć Ci partnerów.</p>
                 
-                <div class="space-y-4 mb-6 relative">
+                <div class="space-y-4 mb-6">
                     <div class="relative">
                         <i class="fas fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input type="text" id="onbName" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phName" placeholder="Twoje Imię">
@@ -466,14 +514,11 @@
                         <i class="fas fa-map-marker-alt absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input type="text" id="onbCity" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" data-i18n-ph="phCity" placeholder="Wpisz swoje miasto...">
                     </div>
-                    
-                    <!-- Autocomplete Sport Input -->
                     <div class="relative">
                         <i class="fas fa-heart absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 z-10"></i>
-                        <input type="text" id="onbSport" autocomplete="off" oninput="filterOnboardingSports()" onclick="toggleOnbSportDropdown(true)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" placeholder="Ulubiony sport (Wpisz lub wybierz)">
+                        <input type="text" id="onbSport" autocomplete="off" oninput="filterOnboardingSports()" onclick="toggleOnbSportDropdown(true)" class="w-full h-12 bg-gray-50 dark:bg-darkcard border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-primary transition font-medium" placeholder="Ulubiony sport (Wpisz lub wybierz)" data-i18n-ph="onbSportOpt">
                         <div id="onbSportDropdown" class="hidden absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-y-auto"></div>
                     </div>
-                    
                     <p id="onbError" class="text-red-500 text-xs font-bold mt-1 hidden text-center" data-i18n="fillDataErr">Uzupełnij wszystkie dane!</p>
                 </div>
 
@@ -483,14 +528,12 @@
             </div>
         </div>
 
-        <!-- 4. GŁÓWNY KONTENER APLIKACJI -->
+        <!-- GŁÓWNA APLIKACJA (SERCE) -->
         <div id="appContainer" class="hidden absolute inset-0 bg-white dark:bg-darkbg flex flex-col z-[10] transition-colors duration-300">
             
             <header id="mainHeader" class="bg-white dark:bg-darkcard px-6 py-4 flex justify-between items-center shadow-sm z-10 safe-top border-b border-gray-100 dark:border-gray-800">
                 <div class="flex items-center space-x-3">
-                    <div class="w-12 h-12">
-                        <img src="MainLogoSportMatcher.png" class="w-full h-full object-contain rounded-xl">
-                    </div>
+                    <div class="w-10 h-10" id="headerLogoContainer"></div>
                     <h1 class="text-xl font-black text-gray-900 dark:text-white tracking-tight">SPORT<span class="text-primary">MATCHER</span></h1>
                 </div>
                 <button onclick="openSettings()" class="text-gray-500 dark:text-gray-400 hover:text-primary transition p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
@@ -499,8 +542,9 @@
             </header>
 
             <!-- Ekran Preferencji (Szukaj) -->
-            <main id="preferencesScreen" class="flex-1 overflow-y-auto p-6 hidden flex-col pt-10 bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
+            <main id="preferencesScreen" class="flex-1 overflow-y-auto p-6 hidden flex-col pt-4 bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
                 <div class="text-center mb-8 mt-2 flex flex-col items-center">
+                    <div class="w-24 h-24 mb-3 drop-shadow-lg" id="mainScreenLogoContainer"></div>
                     <h2 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white" data-i18n="appTitle">Zacznij trening!</h2>
                     <p class="text-gray-500 dark:text-gray-400 text-sm" data-i18n="appSubtitle">Wybierz miasto i sport, aby znaleźć partnerów.</p>
                 </div>
@@ -538,21 +582,18 @@
                 </button>
             </main>
 
-            <!-- NOWY EKRAN POSTÓW (Tablica) -->
+            <!-- Ekran Postów -->
             <main id="postsScreen" class="flex-1 overflow-y-auto p-4 hidden flex-col bg-gray-50 dark:bg-darkbg pb-24 transition-colors duration-300">
                 <div class="flex flex-wrap justify-between items-center mb-4 px-2 gap-3">
                     <h2 class="text-2xl font-bold text-gray-900 dark:text-white" data-i18n="navPosts">Posty</h2>
                     <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
-                        <!-- Filtr po sporcie -->
                         <div class="bg-white dark:bg-darkcard px-2 py-1.5 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 shadow-sm flex items-center relative">
                             <i class="fas fa-search text-primary ml-1 mr-1"></i>
                             <select id="postSportFilter" class="bg-transparent outline-none appearance-none pr-5 pl-1 font-bold cursor-pointer text-gray-700 dark:text-gray-300 z-10 w-24" onchange="renderPosts()">
                                 <option value="all">Wszystkie</option>
-                                <!-- Pozostałe dynamicznie w JS -->
                             </select>
                             <i class="fas fa-chevron-down text-xs text-gray-400 absolute right-2 pointer-events-none"></i>
                         </div>
-                        <!-- Filtr po mieście -->
                         <div class="bg-white dark:bg-darkcard px-2 py-1.5 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 shadow-sm flex items-center relative">
                             <i class="fas fa-map-marker-alt text-primary ml-1 mr-1"></i>
                             <select id="postCityFilter" class="bg-transparent outline-none appearance-none pr-5 pl-1 font-bold cursor-pointer text-gray-700 dark:text-gray-300 z-10 w-24" onchange="renderPosts()">
@@ -572,12 +613,7 @@
                         </div>
                     </div>
                 </div>
-                
-                <div id="postsContainer" class="space-y-4">
-                    <!-- Posty generowane dynamicznie -->
-                </div>
-                
-                <!-- Floating Action Button (Dodaj Post) -->
+                <div id="postsContainer" class="space-y-4"></div>
                 <button onclick="openAddPostModal()" class="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition z-40">
                     <i class="fas fa-plus text-xl"></i>
                 </button>
@@ -611,42 +647,39 @@
             <main id="messagesScreen" class="flex-1 overflow-y-auto bg-white dark:bg-darkbg hidden flex-col pb-20 transition-colors">
                 <div class="p-6 pb-2 border-b border-gray-100 dark:border-gray-800">
                     <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4" data-i18n="matchNew">Nowe Pary</h2>
-                    <div class="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide" id="matchesList">
-                    </div>
+                    <div class="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide" id="matchesList"></div>
                 </div>
                 <div class="p-4">
                     <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 px-2" data-i18n="matchMsg">Wiadomości</h3>
                     <div class="flex space-x-2 overflow-x-auto px-2 pb-3 mb-2 scrollbar-hide" id="chatFilters">
                         <button class="chat-filter-btn active px-4 py-1.5 bg-primary text-white rounded-full text-xs font-bold transition" onclick="filterChats('all', this)" data-i18n="chatAll">Wszystkie</button>
                     </div>
-                    <div id="chatsList">
-                    </div>
+                    <div id="chatsList"></div>
                 </div>
             </main>
 
             <!-- Ekran Chatu -->
             <main id="chatScreen" class="absolute inset-0 bg-gray-50 dark:bg-darkbg z-20 flex flex-col hidden transform translate-x-full transition-transform duration-300">
-                <div class="bg-white dark:bg-darkcard px-4 py-3 flex items-center shadow-sm border-b border-gray-100 dark:border-gray-800 safe-top relative">
-                    <button onclick="closeChat()" class="p-2 mr-2 text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fas fa-chevron-left text-xl"></i></button>
-                    <img id="chatHeaderImg" src="" class="w-10 h-10 rounded-full mr-3 object-cover bg-white">
-                    <div class="flex-1">
-                        <h2 class="font-bold text-gray-800 dark:text-white text-sm"><span id="chatHeaderName">Nazwa</span> <i id="chatHeaderIcon" class="fas fa-check-circle text-primary text-xs ml-1 hidden"></i></h2>
-                        <p class="text-xs text-green-500 font-medium" id="chatHeaderStatus">Online</p>
+                <div class="bg-white dark:bg-darkcard px-4 py-3 flex justify-between items-center shadow-sm border-b border-gray-100 dark:border-gray-800 safe-top">
+                    <div class="flex items-center">
+                        <button onclick="closeChat()" class="p-2 mr-2 text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fas fa-chevron-left text-xl"></i></button>
+                        <img id="chatHeaderImg" src="" class="w-10 h-10 rounded-full mr-3 object-cover bg-white">
+                        <div>
+                            <h2 class="font-bold text-gray-800 dark:text-white text-sm"><span id="chatHeaderName">Nazwa</span> <i id="chatHeaderIcon" class="fas fa-robot text-gray-400 ml-1 hidden"></i></h2>
+                            <p class="text-xs text-green-500 font-medium" id="chatHeaderStatus">Online</p>
+                        </div>
                     </div>
-                    
-                    <!-- 3 kropki z menu opcji czatu -->
-                    <button onclick="toggleChatOptionsMenu()" class="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-white relative">
-                        <i class="fas fa-ellipsis-v text-lg"></i>
-                    </button>
-                    
-                    <div id="chatOptionsMenu" class="hidden absolute top-14 right-4 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 shadow-xl rounded-2xl w-48 z-50 flex flex-col py-2">
-                        <button onclick="pinCurrentChat()" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-gray-700 dark:text-gray-200 transition"><i class="fas fa-thumbtack w-6 text-primary"></i> Przypnij czat</button>
-                        <button onclick="reportCurrentChat()" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-gray-700 dark:text-gray-200 transition"><i class="fas fa-flag w-6 text-orange-500"></i> Zgłoś profil</button>
-                        <div class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
-                        <button onclick="blockCurrentChat()" class="flex items-center px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-bold text-red-600 transition"><i class="fas fa-ban w-6"></i> Zablokuj na zawsze</button>
+                    <!-- Menu opcji czatu -->
+                    <div class="relative">
+                        <button onclick="toggleChatOptionsMenu()" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition"><i class="fas fa-ellipsis-v text-lg"></i></button>
+                        <div id="chatOptionsMenu" class="hidden absolute top-10 right-0 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-700 shadow-xl rounded-2xl py-2 w-48 z-50">
+                            <button onclick="pinCurrentChat()" class="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 transition"><i class="fas fa-thumbtack mr-2 text-gray-400"></i> Przypnij czat</button>
+                            <button onclick="reportUser()" class="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-medium text-orange-500 transition"><i class="fas fa-flag mr-2"></i> Zgłoś użytkownika</button>
+                            <div class="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                            <button onclick="blockUser()" class="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-bold text-red-500 transition"><i class="fas fa-ban mr-2"></i> Zablokuj i usuń</button>
+                        </div>
                     </div>
                 </div>
-                
                 <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll"></div>
                 <div class="bg-white dark:bg-darkcard p-3 border-t border-gray-100 dark:border-gray-800 safe-bottom">
                     <div class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-2 relative">
@@ -654,12 +687,12 @@
                         <div id="attachMenu" class="hidden absolute bottom-12 left-0 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 shadow-lg rounded-2xl p-2 flex flex-col space-y-1 w-56 z-50">
                             <label class="flex items-center space-x-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl cursor-pointer text-sm text-gray-700 dark:text-gray-200 font-medium transition">
                                 <div class="w-8 h-8 bg-green-50 dark:bg-green-900/30 text-primary rounded-full flex items-center justify-center shrink-0"><i class="fas fa-image"></i></div>
-                                <span data-i18n="chatAttachPhoto">Wyślij zdjęcie</span>
+                                <span>Wyślij zdjęcie</span>
                                 <input type="file" class="hidden" accept="image/*" onchange="sendChatPhoto(event)">
                             </label>
                             <button onclick="requestLocationAndOpenVenues()" class="flex items-center space-x-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-left text-sm text-gray-700 dark:text-gray-200 font-medium transition">
                                 <div class="w-8 h-8 bg-orange-50 dark:bg-orange-900/30 text-orange-500 rounded-full flex items-center justify-center shrink-0"><i class="fas fa-map-marker-alt"></i></div>
-                                <span data-i18n="chatSuggestVenue">Zaproponuj miejscówkę</span>
+                                <span>Zaproponuj miejscówkę</span>
                             </button>
                         </div>
                         <input type="text" id="chatInput" placeholder="Napisz wiadomość..." class="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-800 dark:text-white placeholder-gray-500 p-1 outline-none" onkeypress="handleChatEnter(event)">
@@ -981,6 +1014,7 @@
                         <i class="fas fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input type="password" id="deletePassInput" placeholder="Potwierdź swoim hasłem" class="w-full h-12 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-12 pr-4 outline-none focus:border-red-500 transition font-medium text-sm">
                     </div>
+                    <p id="deleteError" class="text-red-500 text-xs font-bold mt-1 mb-4 hidden">Błąd</p>
 
                     <button onclick="confirmDeleteAccount(this)" class="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center mb-3">
                         Tak, usuń moje konto
@@ -1010,20 +1044,32 @@
         </div>
     </div>
 
-    <!-- PONIŻEJ ODBUDOWANY, CZYSTY KOD JAVASCRIPT BEZ DUPLIKATÓW -->
+    <!-- KONTENER NA POWIADOMIENIA (TOASTY) -->
+    <div id="toastContainer"></div>
+
+    <!-- LOGIKA APLIKACJI -->
     <script>
-        // Funkcja do Toastów (eleganckich powiadomień)
-        window.showToast = (message, type = "success") => {
-            const container = document.getElementById("toast-container");
-            const toast = document.createElement("div");
-            toast.className = `toast ${type}`;
-            const icon = type === "success" ? "fa-check-circle" : type === "error" ? "fa-exclamation-circle" : "fa-info-circle";
-            toast.innerHTML = `<i class="fas ${icon} mr-3 text-lg"></i><span>${message}</span>`;
+        // Funkcja wyświetlająca powiadomienia Toast
+        window.showToast = (message, type = 'info') => {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast-msg toast-${type}`;
+            toast.innerText = message;
             container.appendChild(toast);
-            setTimeout(() => { toast.classList.add("toast-exit"); setTimeout(() => toast.remove(), 300); }, 3000);
+            
+            setTimeout(() => {
+                toast.style.animation = 'toastExit 0.3s forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         };
 
-        // ZARZĄDZANIE EKRANEM STARTOWYM
+        // Przywrócenie renderowania loga 
+        ['splashLogoContainer', 'loadingLogoContainer', 'loginLogoContainer', 'onboardingLogoContainer', 'mainScreenLogoContainer', 'headerLogoContainer'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.innerHTML = `<img src="LogoSportMatcher.jpg" class="w-full h-full object-contain rounded-2xl" onerror="this.src='https://placehold.co/512x512/22c55e/ffffff?text=Logo'">`;
+        });
+
+        // 1. ZARZĄDZANIE EKRANEM STARTOWYM
         function toggleDarkMode() { document.documentElement.classList.toggle('dark'); }
 
         window.addEventListener('load', () => {
@@ -1035,7 +1081,7 @@
                 if (filterSportSel) filterSportSel.innerHTML += `<option value="${s.id}">${s.emoji} ${s.name}</option>`; 
             });
             
-            renderSportGrid(); renderPosts(); renderProfileInterests(); renderAllChatsList();
+            renderSportGrid(); renderPosts(); renderProfileInterests();
             
             setTimeout(() => {
                 const splash = document.getElementById('splashScreen');
@@ -1058,43 +1104,6 @@
             const slider = document.getElementById('authSlider');
             slider.style.transform = target === 'register' ? 'translateX(-50%)' : 'translateX(0)';
             document.getElementById('loginError').classList.add('hidden'); document.getElementById('regError').classList.add('hidden');
-        }
-
-        // Tymczasowy przycisk testowy
-        window.simulateTestLogin = () => {
-            document.getElementById('loginScreen').classList.add('screen-exit-active');
-            setTimeout(() => {
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('appContainer').classList.remove('hidden');
-                document.getElementById('appContainer').classList.add('screen-enter-active');
-                document.getElementById('preferencesScreen').classList.remove('hidden');
-                
-                // Ustaw testowe dane
-                document.getElementById('displayName').innerText = 'Tester';
-                document.getElementById('displayCityText').innerText = 'Wrocław';
-                document.getElementById('postCityFilter').value = 'Wrocław';
-                document.getElementById('newPostCity').value = 'Wrocław';
-                userInterests = ['bieganie', 'tenis'];
-                renderProfileInterests();
-                
-                setTimeout(() => { document.getElementById('appContainer').classList.remove('screen-enter-active'); renderPosts(); }, 500);
-            }, 400);
-        };
-
-        function closeEmailConfirmAndContinue() {
-            const confScreen = document.getElementById('emailConfirmModal');
-            confScreen.classList.add('screen-exit-active');
-            setTimeout(() => {
-                confScreen.classList.add('hidden'); confScreen.classList.remove('flex', 'screen-exit-active');
-                const loginScreen = document.getElementById('loginScreen');
-                loginScreen.classList.remove('hidden');
-                loginScreen.classList.add('screen-enter-active');
-                toggleAuthPanel('login');
-                document.getElementById('regEmailInput').value = '';
-                document.getElementById('regPassInput').value = '';
-                document.getElementById('regPassConfirmInput').value = '';
-                setTimeout(() => { loginScreen.classList.remove('screen-enter-active'); }, 500);
-            }, 400);
         }
 
         async function proceedToApp() {
@@ -1153,15 +1162,52 @@
             }, 1000); 
         }
 
-        window.performLogout = () => {
-            if (window.auth && window.signOut) {
-                window.signOut(window.auth);
-            }
+        let isLoggingOut = false;
+        function performLogout() {
+            if(isLoggingOut) return;
+            isLoggingOut = true;
+
+            if (window.auth && window.signOut) { window.signOut(window.auth); }
             closeSettings(); 
-            const appCont = document.getElementById('appContainer'); appCont.classList.add('screen-exit-active');
+            
+            const appCont = document.getElementById('appContainer'); 
+            appCont.classList.add('screen-exit-active');
+            
             setTimeout(() => {
-                window.location.reload(); // Najczystsza forma wyczyszczenia pamięci apki
+                appCont.classList.add('hidden'); 
+                appCont.classList.remove('screen-exit-active');
+                
+                document.getElementById('preferencesScreen').classList.add('hidden'); 
+                document.getElementById('postsScreen').classList.add('hidden'); 
+                document.getElementById('messagesScreen').classList.add('hidden'); 
+                document.getElementById('profileScreen').classList.add('hidden'); 
+                document.getElementById('swipeScreen').classList.add('hidden');
+                
+                const loginScreen = document.getElementById('loginScreen'); 
+                loginScreen.classList.remove('hidden'); 
+                loginScreen.classList.add('screen-enter-active');
+                toggleAuthPanel('login'); 
+                
+                document.getElementById('loginEmailInput').value = ''; 
+                document.getElementById('loginPassInput').value = ''; 
+                document.getElementById('regEmailInput').value = ''; 
+                document.getElementById('regPassInput').value = '';
+                document.getElementById('regPassConfirmInput').value = '';
+                
+                setTimeout(() => { 
+                    loginScreen.classList.remove('screen-enter-active'); 
+                    isLoggingOut = false;
+                    window.location.reload(); 
+                }, 500);
             }, 400);
+        }
+
+        window.testBypassLogin = () => {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('appContainer').classList.remove('hidden');
+            document.getElementById('appContainer').classList.add('screen-enter-active');
+            document.getElementById('preferencesScreen').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('appContainer').classList.remove('screen-enter-active'); renderPosts(); }, 500);
         };
 
         // 3. ONBOARDING
@@ -1247,12 +1293,7 @@
             if (user && window.db && window.setDoc) {
                 try {
                     await window.setDoc(window.doc(window.db, "users", user.uid), {
-                        name: name,
-                        age: age,
-                        city: city,
-                        interests: userInterests,
-                        bio: "",
-                        email: user.email
+                        name: name, age: age, city: city, interests: userInterests, bio: "", email: user.email
                     });
                 } catch (e) { console.error("Błąd zapisu:", e); }
             }
@@ -1267,8 +1308,8 @@
         }
 
         // 4. PROFIL
-        window.toggleEdit = (field) => { document.getElementById('view' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('hidden'); document.getElementById('edit' + field).classList.add('flex'); if(field === 'Bio') updateBioCounter(); }
-        window.saveEdit = async (field) => {
+        function toggleEdit(field) { document.getElementById('view' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('hidden'); document.getElementById('edit' + field).classList.add('flex'); if(field === 'Bio') updateBioCounter(); }
+        async function saveEdit(field) {
             document.getElementById('edit' + field).classList.add('hidden'); document.getElementById('edit' + field).classList.remove('flex'); document.getElementById('view' + field).classList.remove('hidden');
             
             const user = window.auth ? window.auth.currentUser : null;
@@ -1304,26 +1345,26 @@
                 catch (e) { console.error("Błąd aktualizacji:", e); }
             }
         }
-        window.updateBioCounter = () => { const bioInput = document.getElementById('inputBio'); const counter = document.getElementById('bioCounter'); counter.innerText = `${bioInput.value.length}/150 znaków`; }
-        window.togglePlans = () => { const list = document.getElementById('plansList'); if(list.classList.contains('hidden')) { list.classList.remove('hidden'); list.classList.add('fade-in'); } else { list.classList.add('hidden'); list.classList.remove('fade-in'); } }
+        function updateBioCounter() { const bioInput = document.getElementById('inputBio'); const counter = document.getElementById('bioCounter'); counter.innerText = `${bioInput.value.length}/150 znaków`; }
+        function togglePlans() { const list = document.getElementById('plansList'); if(list.classList.contains('hidden')) { list.classList.remove('hidden'); list.classList.add('fade-in'); } else { list.classList.add('hidden'); list.classList.remove('fade-in'); } }
 
         let isPro = false;
         
-        window.simulateStripeSuccess = () => {
+        function simulateStripeSuccess() {
             setTimeout(() => {
                 upgradeToPlan('PRO');
-                window.showToast("Płatność testowa zrealizowana pomyślnie. Konto PRO aktywne!", "success");
+                window.showToast("Płatność udana! Konto PRO aktywne.", "success");
             }, 2000); 
-        };
+        }
 
-        window.upgradeToPlan = (planType) => {
+        function upgradeToPlan(planType) {
             isPro = (planType === 'PRO'); document.getElementById('planName').innerText = planType;
             if(isPro) { document.getElementById('planName').classList.add('text-orange-500'); document.getElementById('accountStatus').innerText = i18n[currentLang].profPrem; document.getElementById('premiumIcon').classList.remove('hidden'); } 
             else { document.getElementById('planName').classList.remove('text-orange-500'); document.getElementById('accountStatus').innerText = i18n[currentLang].profFree; document.getElementById('premiumIcon').classList.add('hidden'); }
             togglePlans();
         }
 
-        window.previewImage = (event) => { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { document.getElementById('profileImage').src = e.target.result; document.getElementById('yourMatchImg').src = e.target.result; }; reader.readAsDataURL(event.target.files[0]); } }
+        function previewImage(event) { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { document.getElementById('profileImage').src = e.target.result; document.getElementById('yourMatchImg').src = e.target.result; }; reader.readAsDataURL(event.target.files[0]); } }
 
         // 5. BAZA SPORTÓW
         const allSports = [
@@ -1367,7 +1408,7 @@
         let selectedSport = 'bieganie';
         let topSports = ['bieganie', 'tenis', 'silownia', 'rower'];
 
-        window.renderSportGrid = () => {
+        function renderSportGrid() {
             const grid = document.getElementById('sportGrid'); grid.innerHTML = '';
             topSports.forEach(sportId => {
                 const s = allSports.find(x => x.id === sportId);
@@ -1376,7 +1417,7 @@
                 btn.className = `sport-btn flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition ${isActive ? 'active border-primary bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-transparent bg-white dark:bg-darkcard shadow-sm text-gray-600 dark:text-gray-300'}`;
                 btn.dataset.sport = s.id;
                 btn.innerHTML = `<span class="text-3xl mb-2">${s.emoji}</span><span class="font-medium">${s.name}</span>`;
-                btn.onclick = () => window.selectSportGlobal(s.id);
+                btn.onclick = () => selectSportGlobal(s.id);
                 grid.appendChild(btn);
             });
         }
@@ -1388,18 +1429,18 @@
                 btn.className = 'all-sport-btn flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-transparent bg-white dark:bg-darkcard shadow-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 transition';
                 btn.dataset.name = sport.name.toLowerCase();
                 btn.innerHTML = `<span class="text-3xl mb-2">${sport.emoji}</span><span class="font-medium text-sm text-center">${sport.name}</span>`;
-                btn.onclick = () => { window.selectSportGlobal(sport.id); window.closeSportSearch(); };
+                btn.onclick = () => { selectSportGlobal(sport.id); closeSportSearch(); };
                 allSportsList.appendChild(btn);
             });
         }
 
-        window.openSportSearch = () => { const m = document.getElementById('sportSearchModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-x-full'), 10); document.getElementById('sportSearchInput').value = ''; window.filterSports(); }
-        window.closeSportSearch = () => { const m = document.getElementById('sportSearchModal'); m.classList.add('translate-x-full'); setTimeout(() => m.classList.add('hidden'), 300); }
-        window.filterSports = () => { const val = document.getElementById('sportSearchInput').value.toLowerCase(); document.querySelectorAll('.all-sport-btn').forEach(btn => { btn.style.display = btn.dataset.name.includes(val) ? 'flex' : 'none'; }); }
+        function openSportSearch() { const m = document.getElementById('sportSearchModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-x-full'), 10); document.getElementById('sportSearchInput').value = ''; filterSports(); }
+        function closeSportSearch() { const m = document.getElementById('sportSearchModal'); m.classList.add('translate-x-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function filterSports() { const val = document.getElementById('sportSearchInput').value.toLowerCase(); document.querySelectorAll('.all-sport-btn').forEach(btn => { btn.style.display = btn.dataset.name.includes(val) ? 'flex' : 'none'; }); }
         
-        window.selectSportGlobal = (sportId) => {
+        function selectSportGlobal(sportId) {
             selectedSport = sportId; if(!topSports.includes(sportId)) { topSports.pop(); topSports.unshift(sportId); }
-            window.renderSportGrid();
+            renderSportGrid();
             const sObj = allSports.find(s=>s.id === selectedSport);
             const citySel = document.getElementById('citySelect');
             const cityName = citySel.value ? citySel.options[citySel.selectedIndex].text : (currentLang==='pl'?"Wybierz miasto":"Select city");
@@ -1434,14 +1475,14 @@
             }
         }
 
-        window.removeProfileInterest = (sportId) => { userInterests = userInterests.filter(id => id !== sportId); renderProfileInterests(); updateInterestsInDB(); }
+        function removeProfileInterest(sportId) { userInterests = userInterests.filter(id => id !== sportId); renderProfileInterests(); updateInterestsInDB(); }
 
-        window.openInterestModal = () => {
+        function openInterestModal() {
             const m = document.getElementById('interestModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10);
             document.getElementById('interestSearchInput').value = ''; renderInterestModalList();
         }
 
-        window.closeInterestModal = () => { const m = document.getElementById('interestModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function closeInterestModal() { const m = document.getElementById('interestModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
 
         function renderInterestModalList() {
             const list = document.getElementById('interestModalList'); list.innerHTML = '';
@@ -1451,13 +1492,13 @@
                     btn.className = 'interest-item w-full text-left px-4 py-3 bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-700 rounded-xl flex items-center hover:border-primary transition mb-1';
                     btn.dataset.name = sport.name.toLowerCase();
                     btn.innerHTML = `<span class="text-2xl mr-3">${sport.emoji}</span> <span class="font-medium text-gray-800 dark:text-white">${sport.name}</span>`;
-                    btn.onclick = () => { userInterests.push(sport.id); renderProfileInterests(); updateInterestsInDB(); window.closeInterestModal(); };
+                    btn.onclick = () => { userInterests.push(sport.id); renderProfileInterests(); updateInterestsInDB(); closeInterestModal(); };
                     list.appendChild(btn);
                 }
             });
         }
 
-        window.filterInterestModal = () => { const val = document.getElementById('interestSearchInput').value.toLowerCase(); document.querySelectorAll('.interest-item').forEach(item => { item.style.display = item.dataset.name.includes(val) ? 'flex' : 'none'; }); }
+        function filterInterestModal() { const val = document.getElementById('interestSearchInput').value.toLowerCase(); document.querySelectorAll('.interest-item').forEach(item => { item.style.display = item.dataset.name.includes(val) ? 'flex' : 'none'; }); }
 
         // 7. I18N
         const i18n = {
@@ -1465,7 +1506,7 @@
                 appTitle: "Zacznij trening!", appSubtitle: "Wybierz miasto i sport, aby znaleźć partnerów.", locationLbl: "Lokalizacja", disciplineLbl: "Dyscyplina",
                 btnSearch: "Szukaj partnerów", noProfTitle: "Brak profili", noProfDesc: "Zmień filtry, by poszukać ponownie.", btnChangeSet: "Zmień ustawienia",
                 matchNew: "Nowe Pary", matchMsg: "Wiadomości", botNow: "Teraz", botPreview: "Gotowy na dzisiejszy trening?", botIntro: "Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪",
-                chatAlways: "Zawsze aktywny", chatToday: "Dziś", profTitle: "Twój Profil", profPrem: "Konto Premium Aktywne", profFree: "Plan Darmowy", profName: "Imię, Wiek i Miasto", profBio: "Moje bio", profInt: "Zainteresowania Sportowe",
+                chatAlways: "Zawsze aktywny", chatToday: "Dziś", profTitle: "Twój Profil", profPrem: "Konto Premium Aktywne", profFree: "Plan Darmowy", profName: "Imię, Wiek i Miasto", profBio: "Moje bio", profInt: "Zainteresowania Sportowe", profPlan: "Mój Plan",
                 setMain: "Ustawienia", setPref: "Preferencje", setLang: "Język aplikacji", setPush: "Powiadomienia Push", setDark: "Tryb Ciemny",
                 setAccount: "Konto", setPass: "Hasło",
                 setInfo: "Informacje i Pomoc", setTerms: "Regulamin", setPriv: "Polityka Prywatności", setHelp: "Centrum Pomocy",
@@ -1482,7 +1523,7 @@
                 appTitle: "Start training!", appSubtitle: "Choose city and sport to find partners.", locationLbl: "Location", disciplineLbl: "Discipline",
                 btnSearch: "Find partners", noProfTitle: "No profiles", noProfDesc: "Change filters to search again.", btnChangeSet: "Change settings",
                 matchNew: "New Matches", matchMsg: "Messages", botNow: "Now", botPreview: "Ready for today's training?", botIntro: "Hi! I'm your virtual assistant. Planning any sports today? 💪",
-                chatAlways: "Always active", chatToday: "Today", profTitle: "Your Profile", profPrem: "Premium Account Active", profFree: "Free Plan", profName: "Name, Age & City", profBio: "My bio", profInt: "Sports Interests",
+                chatAlways: "Always active", chatToday: "Today", profTitle: "Your Profile", profPrem: "Premium Account Active", profFree: "Free Plan", profName: "Name, Age & City", profBio: "My bio", profInt: "Sports Interests", profPlan: "My Plan",
                 setMain: "Settings", setPref: "Preferences", setLang: "App Language", setPush: "Push Notifications", setDark: "Dark Mode",
                 setAccount: "Account", setPass: "Password",
                 setInfo: "Info & Help", setTerms: "Terms of Service", setPriv: "Privacy Policy", setHelp: "Help Center",
@@ -1493,17 +1534,18 @@
                 phEmailLogin: "Email or login", phCity: "Your city", filterAll: "All", chatAttachPhoto: "Send photo", chatSuggestVenue: "Suggest a venue", venuesTitle: "Select a venue",
                 onbTitle: "Just a moment!", onbSub: "Fill in basic info so we can find you partners.", phName: "Your Name", phAge: "Your Age (Min. 18)", onbStart: "Let's go!",
                 onbSportOpt: "Favorite sport (Optional)", addPostTitle: "New post", addPostBtn: "Publish",
-                emailConfTitle: "Confirm your email", emailConfDesc: "We've sent a verification link to your address. Please check your inbox (including SPAM)!", btnUnderstand: "I understand"
+                emailConfTitle: "Confirm your email", emailConfDesc: "We've sent a verification link to your address. Please check your inbox (including SPAM folder)!", btnUnderstand: "I understand"
             }
         };
 
         const modalTexts = {
-            pl: { terms: { title: "Regulamin", content: "<p>1. Akceptacja warunków.<br>Zabrania się używania wulgaryzmów.</p>" }, privacy: { title: "Polityka Prywatności", content: "<p>Twoja prywatność jest ważna.</p>" }, help: { title: "Centrum Pomocy", content: "<p>Napisz do nas: support@sportmatcher.pl</p>" } },
-            en: { terms: { title: "Terms of Service", content: "<p>1. Acceptance of Terms.</p>" }, privacy: { title: "Privacy Policy", content: "<p>Your privacy matters.</p>" }, help: { title: "Help Center", content: "<p>Email us: support@sportmatcher.com</p>" } }
+            pl: { terms: { title: "Regulamin", content: "<p>1. Akceptacja warunków.<br>Zabrania się używania wulgaryzmów oraz publikowania treści nieodpowiednich.</p><p>2. Opłaty.<br>Konto PRO jest subskrypcją dobrowolną.</p>" }, privacy: { title: "Polityka Prywatności", content: "<p>Twoja prywatność jest dla nas priorytetem.</p><p>Przechowujemy wyłącznie niezbędne dane do działania usługi. Nie sprzedajemy danych podmiotom trzecim.</p>" }, help: { title: "Centrum Pomocy", content: "<p>Masz problem z aplikacją?</p><p>Napisz do nas: <b>kontakt@sportmatcher.pl</b></p>" } },
+            en: { terms: { title: "Terms of Service", content: "<p>1. Acceptance of Terms.<br>Inappropriate content is strictly prohibited.</p>" }, privacy: { title: "Privacy Policy", content: "<p>Your privacy matters to us.</p>" }, help: { title: "Help Center", content: "<p>Need help?</p><p>Email us: <b>support@sportmatcher.com</b></p>" } }
         };
 
         let currentLang = 'pl';
-        window.changeLang = (val) => { currentLang = val; if(document.getElementById('loginLangSelect')) document.getElementById('loginLangSelect').value = val; if(document.getElementById('languageSelect')) document.getElementById('languageSelect').value = val; applyTranslations(currentLang); }
+        function changeLang(val) { currentLang = val; if(document.getElementById('loginLangSelect')) document.getElementById('loginLangSelect').value = val; if(document.getElementById('languageSelect')) document.getElementById('languageSelect').value = val; applyTranslations(currentLang); }
+        document.getElementById('languageSelect').addEventListener('change', (e) => { changeLang(e.target.value); });
         
         function applyTranslations(lang) {
             const dict = i18n[lang];
@@ -1525,7 +1567,7 @@
         let pendingPostMedia = null;
         let pendingPostMediaType = null;
 
-        window.renderPosts = () => {
+        function renderPosts() {
             const container = document.getElementById('postsContainer'); container.innerHTML = '';
             const cityFilterVal = document.getElementById('postCityFilter').value;
             const sportFilterVal = document.getElementById('postSportFilter').value;
@@ -1559,8 +1601,9 @@
                 }
 
                 container.innerHTML += `
-                    <div class="bg-white dark:bg-darkcard rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors fade-in">
-                        <div class="flex justify-between items-center mb-2">
+                    <div class="bg-white dark:bg-darkcard rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 transition-colors fade-in relative group">
+                        <button onclick="window.showToast('Post został zgłoszony', 'info')" class="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition"><i class="fas fa-flag text-xs"></i></button>
+                        <div class="flex justify-between items-center mb-2 pr-6">
                             <div class="flex items-center space-x-2"><img src="${post.avatar}" class="w-8 h-8 rounded-full object-cover bg-gray-200"><span class="font-bold text-sm text-gray-800 dark:text-white">${post.author}</span></div>
                             <span class="text-xs text-gray-400">${post.time}</span>
                         </div>
@@ -1572,23 +1615,23 @@
             });
         }
 
-        window.renderNewPostSports = () => {
+        function renderNewPostSports() {
             const dropdown = document.getElementById('newPostSportDropdown'); dropdown.innerHTML = '';
             allSports.forEach(s => {
                 const btn = document.createElement('div');
                 btn.className = 'new-post-sport-item px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-sm dark:text-white transition';
                 btn.innerHTML = `<span class="mr-2 text-lg w-6">${s.emoji}</span> ${s.name}`;
-                btn.onclick = () => { document.getElementById('newPostSportSearch').value = `${s.emoji} ${s.name}`; document.getElementById('newPostSportValue').value = s.id; window.toggleNewPostSportDropdown(false); };
+                btn.onclick = () => { document.getElementById('newPostSportSearch').value = `${s.emoji} ${s.name}`; document.getElementById('newPostSportValue').value = s.id; toggleNewPostSportDropdown(false); };
                 dropdown.appendChild(btn);
             });
         }
         
-        window.toggleNewPostSportDropdown = (show) => { document.getElementById('newPostSportDropdown').style.display = show ? 'block' : 'none'; }
-        window.filterNewPostSports = () => { const val = document.getElementById('newPostSportSearch').value.toLowerCase(); document.querySelectorAll('.new-post-sport-item').forEach(item => { item.style.display = item.innerText.toLowerCase().includes(val) ? 'flex' : 'none'; }); }
+        function toggleNewPostSportDropdown(show) { document.getElementById('newPostSportDropdown').style.display = show ? 'block' : 'none'; }
+        function filterNewPostSports() { const val = document.getElementById('newPostSportSearch').value.toLowerCase(); document.querySelectorAll('.new-post-sport-item').forEach(item => { item.style.display = item.innerText.toLowerCase().includes(val) ? 'flex' : 'none'; }); }
 
-        window.updatePostCounter = () => { const len = document.getElementById('newPostContent').value.length; document.getElementById('newPostCounter').innerText = `${len}/200 znaków`; }
+        function updatePostCounter() { const len = document.getElementById('newPostContent').value.length; document.getElementById('newPostCounter').innerText = `${len}/200 znaków`; }
 
-        window.handlePostMedia = (event) => {
+        function handlePostMedia(event) {
             const file = event.target.files[0];
             if (!file) return;
             pendingPostMediaType = file.type;
@@ -1604,17 +1647,17 @@
             reader.readAsDataURL(file);
         }
 
-        window.clearPostMedia = () => { pendingPostMedia = null; pendingPostMediaType = null; document.getElementById('newPostMediaInput').value = ''; document.getElementById('newPostMediaPreview').classList.add('hidden'); }
+        function clearPostMedia() { pendingPostMedia = null; pendingPostMediaType = null; document.getElementById('newPostMediaInput').value = ''; document.getElementById('newPostMediaPreview').classList.add('hidden'); }
 
-        window.openAddPostModal = () => { 
+        function openAddPostModal() { 
             const m = document.getElementById('addPostModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10); 
             document.getElementById('newPostContent').value = ''; document.getElementById('newPostSportSearch').value = ''; document.getElementById('newPostSportValue').value = ''; document.getElementById('addPostError').classList.add('hidden');
-            window.clearPostMedia(); window.updatePostCounter();
+            clearPostMedia(); updatePostCounter();
         }
         
-        window.closeAddPostModal = () => { const m = document.getElementById('addPostModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function closeAddPostModal() { const m = document.getElementById('addPostModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
         
-        window.submitNewPost = () => {
+        function submitNewPost() {
             const content = document.getElementById('newPostContent').value.trim();
             const sport = document.getElementById('newPostSportValue').value;
             const city = document.getElementById('newPostCity').value;
@@ -1625,17 +1668,17 @@
             postsDB.push({ id: Date.now(), author: document.getElementById('inputName').value || 'Ty', avatar: document.getElementById('profileImage').src, time: 'Teraz', content: content, sport: sport, city: city, media: pendingPostMedia, mediaType: pendingPostMediaType });
             
             document.getElementById('postCityFilter').value = city; document.getElementById('postSportFilter').value = 'all';
-            window.renderPosts(); window.closeAddPostModal();
+            renderPosts(); closeAddPostModal();
         }
 
         // 9. SWIPE I MATCH
         let currentCards = []; let matches = []; let activeChatFilters = new Set();
-        const profilesDB = []; // Wyczyść fejkowe profile
+        const profilesDB = []; // Całkowicie wyczyszczone bazy, apka pusta
 
         const screensApp = ['preferencesScreen', 'swipeScreen', 'messagesScreen', 'profileScreen', 'postsScreen'];
-        window.navTo = (screenId, btnElement = null) => {
+        function navTo(screenId, btnElement = null) {
             screensApp.forEach(s => { const el = document.getElementById(s); if(el) { el.classList.add('hidden'); el.classList.remove('fade-in'); } });
-            window.closeChat();
+            closeChat();
             const target = document.getElementById(screenId); target.classList.remove('hidden'); target.classList.add('flex', 'fade-in');
             if (btnElement) { document.querySelectorAll('.nav-btn').forEach(b => { b.classList.remove('text-primary'); b.classList.add('text-gray-400', 'dark:text-gray-500'); }); btnElement.classList.remove('text-gray-400', 'dark:text-gray-500'); btnElement.classList.add('text-primary'); }
         }
@@ -1644,20 +1687,20 @@
             const citySel = document.getElementById('citySelect');
             if(!citySel.value) { document.getElementById('citySelectError').classList.remove('hidden'); return; }
             document.getElementById('citySelectError').classList.add('hidden');
-            window.navTo('swipeScreen'); window.startMatching(); 
+            navTo('swipeScreen'); startMatching(); 
         });
 
-        window.startMatching = () => {
+        function startMatching() {
             const cityName = document.getElementById('citySelect').options[document.getElementById('citySelect').selectedIndex].text;
             const sportObj = allSports.find(s=>s.id === selectedSport);
             document.getElementById('currentFilterText').innerHTML = `<i class="fas fa-map-marker-alt text-primary mr-2"></i> <span>${cityName} • ${sportObj.emoji} ${sportObj.name}</span>`;
             
             let filtered = profilesDB.filter(p => p.city.toLowerCase() === cityName.toLowerCase() && p.sport === selectedSport);
             currentCards = [...filtered].sort(() => Math.random() - 0.5);
-            window.renderCards();
+            renderCards();
         }
 
-        window.renderCards = () => {
+        function renderCards() {
             const cardStack = document.getElementById('cardStack'); cardStack.innerHTML = '';
             if (currentCards.length === 0) { document.getElementById('noMoreCards').classList.remove('hidden'); document.getElementById('noMoreCards').classList.add('flex'); return; }
             document.getElementById('noMoreCards').classList.add('hidden'); document.getElementById('noMoreCards').classList.remove('flex');
@@ -1670,33 +1713,33 @@
             });
         }
 
-        document.getElementById('btnNope').addEventListener('click', () => window.handleAction('nope'));
-        document.getElementById('btnLike').addEventListener('click', () => window.handleAction('like'));
+        document.getElementById('btnNope').addEventListener('click', () => handleAction('nope'));
+        document.getElementById('btnLike').addEventListener('click', () => handleAction('like'));
 
         let pendingMatchProfile = null;
-        window.handleAction = (action) => {
+        function handleAction(action) {
             if (currentCards.length === 0) return;
             const stack = document.getElementById('cardStack'); const topCardElement = stack.querySelectorAll('.profile-card')[stack.querySelectorAll('.profile-card').length - 1];
             const profile = currentCards.shift();
             if (topCardElement) {
                 topCardElement.classList.add(action === 'like' ? 'swiped-right' : 'swiped-left');
-                if (action === 'like' && (Math.random() < 0.4 || currentCards.length === 0)) setTimeout(() => window.showMatchModal(profile), 300);
-                setTimeout(() => { topCardElement.remove(); stack.querySelectorAll('.profile-card').forEach(c => c.style.transform = `scale(1) translateY(0)`); if (currentCards.length === 0) window.renderCards(); }, 300);
+                if (action === 'like' && (Math.random() < 0.4 || currentCards.length === 0)) setTimeout(() => showMatchModal(profile), 300);
+                setTimeout(() => { topCardElement.remove(); stack.querySelectorAll('.profile-card').forEach(c => c.style.transform = `scale(1) translateY(0)`); if (currentCards.length === 0) renderCards(); }, 300);
             }
         }
 
-        window.showMatchModal = (profile) => { pendingMatchProfile = profile; document.getElementById('matchImage').src = profile.img; document.getElementById('matchName').innerText = profile.name; document.getElementById('matchModal').classList.remove('hidden'); document.getElementById('matchModal').classList.add('flex'); }
-        window.closeMatchModal = (goToChat = false) => { 
+        function showMatchModal(profile) { pendingMatchProfile = profile; document.getElementById('matchImage').src = profile.img; document.getElementById('matchName').innerText = profile.name; document.getElementById('matchModal').classList.remove('hidden'); document.getElementById('matchModal').classList.add('flex'); }
+        function closeMatchModal(goToChat = false) { 
             document.getElementById('matchModal').classList.add('hidden'); document.getElementById('matchModal').classList.remove('flex'); 
             if(pendingMatchProfile) {
-                window.addMatchToChats(pendingMatchProfile);
-                if(goToChat) { window.navTo('messagesScreen', document.querySelectorAll('.nav-btn')[2]); window.openChat(pendingMatchProfile.id, pendingMatchProfile.name, pendingMatchProfile.img); }
+                addMatchToChats(pendingMatchProfile);
+                if(goToChat) { navTo('messagesScreen', document.querySelectorAll('.nav-btn')[2]); openChat(pendingMatchProfile.id, pendingMatchProfile.name, pendingMatchProfile.img); }
                 pendingMatchProfile = null;
-            } else if (goToChat) { window.navTo('messagesScreen', document.querySelectorAll('.nav-btn')[2]); }
+            } else if (goToChat) { navTo('messagesScreen', document.querySelectorAll('.nav-btn')[2]); }
         }
 
         // 10. USTAWIENIA MODALE
-        window.openSettings = () => { 
+        function openSettings() { 
             const user = window.auth ? window.auth.currentUser : null;
             if(user) {
                 document.getElementById('settingsEmail').innerText = user.email || (currentLang === 'pl' ? 'Zalogowano przez Social Media' : 'Logged in via Social Media');
@@ -1704,138 +1747,127 @@
             const m = document.getElementById('settingsModal'); 
             m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10); 
         }
-        window.closeSettings = () => { const m = document.getElementById('settingsModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
-        window.openTextModal = (type) => { const data = modalTexts[currentLang][type]; document.getElementById('textModalTitle').innerText = data.title; document.getElementById('textModalContent').innerHTML = data.content; document.getElementById('textModal').classList.remove('hidden'); setTimeout(() => document.getElementById('textModal').classList.remove('translate-y-full'), 10); }
-        window.closeTextModal = () => { document.getElementById('textModal').classList.add('translate-y-full'); setTimeout(() => document.getElementById('textModal').classList.add('hidden'), 300); }
+        function closeSettings() { const m = document.getElementById('settingsModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function openTextModal(type) { const data = modalTexts[currentLang][type]; document.getElementById('textModalTitle').innerText = data.title; document.getElementById('textModalContent').innerHTML = data.content; document.getElementById('textModal').classList.remove('hidden'); setTimeout(() => document.getElementById('textModal').classList.remove('translate-y-full'), 10); }
+        function closeTextModal() { document.getElementById('textModal').classList.add('translate-y-full'); setTimeout(() => document.getElementById('textModal').classList.add('hidden'), 300); }
 
         // 11. CZAT, BOT I MIEJSCÓWKI
         const chatScreen = document.getElementById('chatScreen'); const messagesContainer = document.getElementById('chatMessages'); const inputField = document.getElementById('chatInput');
         const defaultBotAvatar = 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff';
         const apiKey = "AIzaSyAR_bJlo8vhKrdJxk8xxG4WNvWZoP3DjIA"; 
 
-        // NOWY STAN CZATÓW
-        let blockedUsers = new Set();
-        let pinnedUsers = new Set(['bot']); // Bot zawsze przypięty na start
         let allChatHistories = {
-            'bot': { id: 'bot', name: 'Trener Bot', img: defaultBotAvatar, sport: 'bot', messages: [{ role: 'model', parts: [{text: 'Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪'}]}] }
+            'bot': { name: 'Trener Bot', img: defaultBotAvatar, isPinned: true, sport: 'bot', messages: [{ role: 'model', parts: [{text: 'Cześć! Jestem Twoim wirtualnym asystentem. Masz w planach jakiś sport na dzisiaj? 💪'}]}] }
         };
-        let currentChatId = 'bot';
+        let currentChatId = null;
 
-        window.addMatchToChats = (profile) => {
-            if(allChatHistories[profile.id] || blockedUsers.has(profile.id)) return; 
-            allChatHistories[profile.id] = { id: profile.id, name: profile.name, img: profile.img, sport: profile.sport, messages: [{ role: 'model', parts: [{text: `Hej! Dzięki za match! Kiedy lecimy na trening?`}] }] };
+        function addMatchToChats(profile) {
+            if(allChatHistories[profile.id]) return; 
+            allChatHistories[profile.id] = { name: profile.name, img: profile.img, isPinned: false, sport: profile.sport, messages: [{ role: 'model', parts: [{text: `Hej! Dzięki za match! Kiedy lecimy na trening?`}] }] };
             
-            matches.push(profile); 
             if(!activeChatFilters.has(profile.sport)) {
                 activeChatFilters.add(profile.sport); const sObj = allSports.find(s=>s.id === profile.sport);
-                if(sObj) { const fBar = document.getElementById('chatFilters'); const btn = document.createElement('button'); btn.className = "chat-filter-btn px-4 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full text-xs font-bold transition"; btn.onclick = function() { window.filterChats(profile.sport, this); }; btn.innerHTML = `${sObj.emoji} ${sObj.name}`; fBar.appendChild(btn); }
+                if(sObj) { const fBar = document.getElementById('chatFilters'); const btn = document.createElement('button'); btn.className = "chat-filter-btn px-4 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full text-xs font-bold transition"; btn.onclick = function() { filterChats(profile.sport, this); }; btn.innerHTML = `${sObj.emoji} ${sObj.name}`; fBar.appendChild(btn); }
             }
-            window.renderAllChatsList();
+            renderAllChatsList();
         }
 
-        // Centralna funkcja rysująca listę i kółka czatów
-        window.renderAllChatsList = () => {
-            const slider = document.getElementById('matchesList');
-            const chatList = document.getElementById('chatsList');
-            slider.innerHTML = '';
-            chatList.innerHTML = '';
+        function renderAllChatsList() {
+            const list = document.getElementById('chatsList'); list.innerHTML = '';
+            const topSlider = document.getElementById('matchesList'); topSlider.innerHTML = '';
+            
+            let chatsArray = Object.keys(allChatHistories).map(key => ({ id: key, ...allChatHistories[key] }));
+            chatsArray.sort((a, b) => (a.isPinned === b.isPinned) ? 0 : a.isPinned ? -1 : 1);
 
-            // Wyświetl przypięte najpierw, potem resztę, ale pomijaj zablokowanych
-            let sortedIds = Object.keys(allChatHistories).filter(id => !blockedUsers.has(id)).sort((a, b) => {
-                const aPin = pinnedUsers.has(a) ? 1 : 0;
-                const bPin = pinnedUsers.has(b) ? 1 : 0;
-                return bPin - aPin; // Przypięte na gorze
+            chatsArray.forEach(chat => {
+                const isBot = chat.id === 'bot';
+                const lastMsg = chat.messages[chat.messages.length - 1];
+                const lastText = lastMsg.parts[0].text.substring(0, 20) + '...';
+                const prefix = lastMsg.role === 'user' ? 'Ty: ' : '';
+                const pinIcon = chat.isPinned ? `<i class="fas fa-thumbtack text-accent text-[10px] ml-2"></i>` : '';
+
+                list.innerHTML += `<div class="chat-item flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl cursor-pointer transition fade-in" data-sport="${chat.sport}" onclick="openChat('${chat.id}')">
+                    <img src="${chat.img}" class="w-14 h-14 rounded-full mr-4 object-cover bg-white">
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center mb-1">
+                            <h4 class="font-bold text-gray-900 dark:text-white flex items-center">${chat.name} ${isBot ? '<i class="fas fa-check-circle text-primary text-xs ml-1"></i>' : ''} ${pinIcon}</h4>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[200px]" id="preview-msg-${chat.id}">${prefix}${lastText}</p>
+                    </div>
+                </div>`;
+
+                topSlider.innerHTML += `<div class="flex flex-col items-center cursor-pointer fade-in" onclick="openChat('${chat.id}')">
+                    <div class="relative">
+                        <div class="w-16 h-16 rounded-full border-2 ${isBot ? 'border-primary' : 'border-gray-200 dark:border-gray-700'} p-0.5">
+                            <img src="${chat.img}" class="w-full h-full rounded-full object-cover bg-white">
+                        </div>
+                        <div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                    </div>
+                    <span class="text-xs font-bold mt-1 dark:text-gray-300 w-16 truncate text-center">${chat.name}</span>
+                </div>`;
             });
-
-            sortedIds.forEach(id => {
-                const chatData = allChatHistories[id];
-                const isPinned = pinnedUsers.has(id);
-                
-                // Rysuj kółko (tylko dla nowych/zwykłych)
-                if (id !== 'bot') {
-                    const circle = document.createElement('div'); circle.className = 'flex flex-col items-center cursor-pointer fade-in';
-                    circle.onclick = () => window.openChat(id, chatData.name, chatData.img);
-                    circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${chatData.img}" class="w-full h-full rounded-full object-cover bg-white"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300 truncate w-16 text-center">${chatData.name}</span>`;
-                    slider.appendChild(circle);
-                } else {
-                    const circle = document.createElement('div'); circle.className = 'flex flex-col items-center cursor-pointer fade-in';
-                    circle.onclick = () => window.openChat('bot', 'Trener Bot', defaultBotAvatar);
-                    circle.innerHTML = `<div class="relative"><div class="w-16 h-16 rounded-full border-2 border-primary p-0.5"><img src="${defaultBotAvatar}" class="w-full h-full rounded-full object-cover"></div><div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div></div><span class="text-xs font-bold mt-1 dark:text-gray-300">Trener Bot</span>`;
-                    slider.appendChild(circle);
-                }
-
-                // Rysuj na liście pod spodem
-                const lastMsg = chatData.messages[chatData.messages.length - 1];
-                let msgPreview = "Wiadomość...";
-                if(lastMsg) { msgPreview = lastMsg.role === 'user' ? `Ty: ${lastMsg.parts[0].text.substring(0,20)}...` : lastMsg.parts[0].text.substring(0,20)+'...'; }
-                
-                const pinIcon = isPinned ? `<i class="fas fa-thumbtack text-primary text-xs ml-2"></i>` : '';
-                const checkIcon = id === 'bot' ? `<i class="fas fa-check-circle text-primary text-xs ml-1"></i>` : '';
-
-                const listItem = document.createElement('div'); listItem.className = 'chat-item flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl cursor-pointer transition fade-in';
-                listItem.dataset.sport = chatData.sport; listItem.onclick = () => window.openChat(id, chatData.name, chatData.img);
-                listItem.innerHTML = `<img src="${chatData.img}" class="w-14 h-14 rounded-full mr-4 object-cover bg-white"><div class="flex-1"><div class="flex justify-between items-center mb-1"><h4 class="font-bold text-gray-900 dark:text-white flex items-center">${chatData.name} ${checkIcon} ${pinIcon}</h4><span class="text-xs text-gray-400">Teraz</span></div><p class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[200px]" id="preview-msg-${id}">${msgPreview}</p></div><div class="w-3 h-3 bg-primary rounded-full ml-2"></div>`;
-                chatList.appendChild(listItem);
-            });
-        };
-
-        window.filterChats = (sportId, btnElement) => { document.querySelectorAll('.chat-filter-btn').forEach(btn => { btn.classList.remove('bg-primary', 'text-white'); btn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300'); }); btnElement.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300'); btnElement.classList.add('bg-primary', 'text-white'); document.querySelectorAll('.chat-item').forEach(item => { if(sportId === 'all' || item.dataset.sport === sportId || item.dataset.sport === 'bot') { item.style.display = 'flex'; } else { item.style.display = 'none'; } }); }
-        
-        // Funkcje opcji z górnego menu czatu
-        window.toggleChatOptionsMenu = () => { document.getElementById('chatOptionsMenu').classList.toggle('hidden'); }
-        window.pinCurrentChat = () => {
-            if(pinnedUsers.has(currentChatId)) { pinnedUsers.delete(currentChatId); window.showToast("Czat odpięto.", "info"); }
-            else { pinnedUsers.add(currentChatId); window.showToast("Czat przypięty do góry!", "success"); }
-            window.toggleChatOptionsMenu(); window.renderAllChatsList();
-        }
-        window.reportCurrentChat = () => {
-            window.showToast("Zgłoszenie wysłane do moderacji. Dziękujemy.", "success");
-            window.toggleChatOptionsMenu();
-        }
-        window.blockCurrentChat = () => {
-            if(currentChatId === 'bot') { window.showToast("Nie możesz zablokować Asystenta!", "error"); window.toggleChatOptionsMenu(); return; }
-            blockedUsers.add(currentChatId);
-            window.showToast("Użytkownik został na zawsze zablokowany.", "success");
-            window.toggleChatOptionsMenu();
-            window.closeChat();
-            window.renderAllChatsList();
         }
 
-        // Zamknięcie menu opcji przy kliknięciu obok
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('chatOptionsMenu');
-            if (menu && !menu.classList.contains('hidden') && !e.target.closest('#chatOptionsMenu') && !e.target.closest('button[onclick="toggleChatOptionsMenu()"]')) {
-                menu.classList.add('hidden');
-            }
+        // Akcje menu czatu
+        function toggleChatOptionsMenu() { document.getElementById('chatOptionsMenu').classList.toggle('hidden'); }
+        document.addEventListener('click', function(event) { 
+            const menu = document.getElementById('chatOptionsMenu'); 
+            if(menu && !menu.classList.contains('hidden')) { 
+                const btn = menu.previousElementSibling; 
+                if (!menu.contains(event.target) && !btn.contains(event.target)) { menu.classList.add('hidden'); } 
+            } 
         });
 
+        function pinCurrentChat() {
+            if(!currentChatId) return;
+            allChatHistories[currentChatId].isPinned = !allChatHistories[currentChatId].isPinned;
+            window.showToast(allChatHistories[currentChatId].isPinned ? "Przypięto czat" : "Odpięto czat", "success");
+            renderAllChatsList();
+            toggleChatOptionsMenu();
+        }
+
+        function reportUser() {
+            window.showToast("Zgłoszenie wysłane do moderacji.", "info");
+            toggleChatOptionsMenu();
+        }
+
+        function blockUser() {
+            if(!currentChatId || currentChatId === 'bot') { window.showToast("Nie możesz zablokować Bota!", "error"); return; }
+            delete allChatHistories[currentChatId];
+            window.showToast("Użytkownik został zablokowany.", "success");
+            renderAllChatsList();
+            closeChat();
+        }
+
+        function filterChats(sportId, btnElement) { document.querySelectorAll('.chat-filter-btn').forEach(btn => { btn.classList.remove('bg-primary', 'text-white'); btn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300'); }); btnElement.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300'); btnElement.classList.add('bg-primary', 'text-white'); document.querySelectorAll('.chat-item').forEach(item => { if(sportId === 'all' || item.dataset.sport === sportId || item.dataset.sport === 'bot') { item.style.display = 'flex'; } else { item.style.display = 'none'; } }); }
+        
         function getSystemPrompt() {
             if(currentChatId === 'bot') {
-                return `Jesteś 'Trener Bot', asystentem w SportMatcher. ZAKAZ wulgaryzmów.
+                return `Jesteś 'Trener Bot', asystentem w SportMatcher.
 STAN KONTA UŻYTKOWNIKA: ${isPro ? 'PRO (PREMIUM)' : 'DARMOWE'}.
 Jeśli użytkownik prosi o plan treningowy:
 - Gdy stan konta to PRO, stwórz mu szczegółowy, "perfekcyjny i skuteczny" plan treningowy.
 - Gdy stan konta to DARMOWE, grzecznie, ale STANOWCZO odmów, i powiedz: "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!" i nic więcej nie podawaj.
 Poza tym krótko motywuj do treningu.`;
             } else {
-                const matchInfo = matches.find(m => m.id === currentChatId) || {name: "Sportowiec"};
+                const matchInfo = allChatHistories[currentChatId] || {name: "Sportowiec"};
                 return `Wcielasz się w postać sportowca o imieniu ${matchInfo.name}. Jesteście parą w aplikacji (zmatchowaliście się). Bądź przyjacielski, odpisuj BARDZO KRÓTKO (1 zdanie). Zaproponuj wspólny trening. ZERO wulgaryzmów.`;
             }
         }
 
-        window.toggleAttachMenu = () => { document.getElementById('attachMenu').classList.toggle('hidden'); }
-        window.sendChatPhoto = (event) => { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { window.appendMessageUI(`<img src="${e.target.result}" class="rounded-xl mt-1 max-w-full h-auto border border-gray-100 dark:border-gray-700 shadow-sm" style="max-height: 200px; object-fit: cover;">`, true); window.toggleAttachMenu(); }; reader.readAsDataURL(event.target.files[0]); } }
+        function toggleAttachMenu() { document.getElementById('attachMenu').classList.toggle('hidden'); }
+        function sendChatPhoto(event) { if (event.target.files && event.target.files[0]) { const reader = new FileReader(); reader.onload = e => { appendMessageUI(`<img src="${e.target.result}" class="rounded-xl mt-1 max-w-full h-auto border border-gray-100 dark:border-gray-700 shadow-sm" style="max-height: 200px; object-fit: cover;">`, true); toggleAttachMenu(); }; reader.readAsDataURL(event.target.files[0]); } }
         
-        window.requestLocationAndOpenVenues = () => {
-            window.toggleAttachMenu();
+        function requestLocationAndOpenVenues() {
+            toggleAttachMenu();
             const m = document.getElementById('venuesModal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('translate-y-full'), 10);
             document.getElementById('gpsPermission').classList.remove('hidden'); document.getElementById('gpsPermission').classList.add('flex');
             document.getElementById('venuesLoading').classList.add('hidden'); document.getElementById('venuesLoading').classList.remove('flex');
             document.getElementById('venuesResults').classList.add('hidden'); document.getElementById('venuesResults').classList.remove('flex');
         }
 
-        window.openVenuesModal = () => { 
-            let matchName = currentChatId === 'bot' ? 'Trener Bot' : (matches.find(m=>m.id==currentChatId)?.name || 'Match');
+        function openVenuesModal() { 
+            let matchName = allChatHistories[currentChatId]?.name || 'Match';
             document.getElementById('vLoadMatchName').innerText = matchName; document.getElementById('vmMatchName').innerText = matchName;
             
             document.getElementById('gpsPermission').classList.add('hidden'); document.getElementById('gpsPermission').classList.remove('flex');
@@ -1843,31 +1875,31 @@ Poza tym krótko motywuj do treningu.`;
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
-                    (position) => { window.loadVenues(position.coords.latitude, position.coords.longitude); },
-                    (error) => { console.log("Brak zgody na GPS, ładuję domyślne."); window.loadVenues(null, null); }
+                    (position) => { loadVenues(position.coords.latitude, position.coords.longitude); },
+                    (error) => { console.log("Brak zgody na GPS, ładuję domyślne."); loadVenues(null, null); }
                 );
-            } else { window.loadVenues(null, null); }
+            } else { loadVenues(null, null); }
         }
 
-        window.loadVenues = (lat, lng) => {
+        function loadVenues(lat, lng) {
             setTimeout(() => {
                 document.getElementById('venuesLoading').classList.add('hidden'); document.getElementById('venuesLoading').classList.remove('flex');
                 document.getElementById('venuesResults').classList.remove('hidden'); document.getElementById('venuesResults').classList.add('flex');
                 
                 let matchSportId = selectedSport;
-                if (currentChatId !== 'bot') { const matchProfile = matches.find(m => m.id == currentChatId); if (matchProfile) matchSportId = matchProfile.sport; }
+                if (currentChatId !== 'bot') { const matchProfile = allChatHistories[currentChatId]; if (matchProfile) matchSportId = matchProfile.sport; }
                 const city = document.getElementById('inputProfileCity').value || 'Wrocław';
                 const sportObj = allSports.find(s => s.id === matchSportId) || allSports[0];
                 
                 const query = encodeURIComponent(`${city} ${sportObj.name}`);
                 document.getElementById('gmapIframe').src = `https://maps.google.com/maps?q=${query}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
-                window.renderVenuesList(sportObj, query);
+                renderVenuesList(sportObj, query);
             }, 1800);
         }
         
-        window.closeVenuesModal = () => { const m = document.getElementById('venuesModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
+        function closeVenuesModal() { const m = document.getElementById('venuesModal'); m.classList.add('translate-y-full'); setTimeout(() => m.classList.add('hidden'), 300); }
         
-        window.renderVenuesList = (sportObj, cityQuery) => {
+        function renderVenuesList(sportObj, cityQuery) {
             const list = document.getElementById('venuesDynamicList'); list.innerHTML = '';
             const mockVenues = [
                 { name: `Darmowa strefa - ${sportObj.name}`, free: true, price: 'Darmowe', dist: '1.2 km', q: `${cityQuery} public` },
@@ -1885,90 +1917,65 @@ Poza tym krótko motywuj do treningu.`;
             });
         }
 
-        window.sendVenue = (venueName, isFree) => { 
+        function sendVenue(venueName, isFree) { 
             const costStr = isFree ? '(Darmowe 🟢)' : '(Płatne 🟡)';
             const txt = `📍 Zaproponowałem miejscówkę (Połowa drogi):\n<b>${venueName}</b> ${costStr}`; 
-            window.appendMessageUI(txt, true); allChatHistories[currentChatId].messages.push({ role: "user", parts: [{ text: txt }] }); window.closeVenuesModal(); setTimeout(() => { window.triggerBotResponse(); }, 1000);
+            appendMessageUI(txt, true); allChatHistories[currentChatId].messages.push({ role: "user", parts: [{ text: txt }] }); closeVenuesModal(); setTimeout(() => { triggerBotResponse(); }, 1000);
         }
-
-        window.openChat = (id, name = 'Trener Bot', img = defaultBotAvatar) => {
+        
+        function openChat(id) {
             currentChatId = id;
-            if(!allChatHistories[id]) { 
-                allChatHistories[id] = { id: id, name: name, img: img, sport: 'bot', messages: [{ role: 'model', parts: [{text: `Hej! Dzięki za match! Kiedy lecimy na trening?`}] }] }; 
-            }
-            
-            document.getElementById('chatHeaderName').innerText = name;
-            const icon = document.getElementById('chatHeaderIcon');
-            if (icon) {
-                icon.className = id === 'bot' ? 'fas fa-robot text-gray-400 ml-1' : 'fas fa-check-circle text-primary text-xs ml-1';
-                icon.classList.remove('hidden');
-            }
-            document.getElementById('chatHeaderImg').src = img;
+            const chatData = allChatHistories[id];
+            if(!chatData) return;
+
+            document.getElementById('chatHeaderName').innerHTML = `${chatData.name} ${id === 'bot' ? '<i class="fas fa-check-circle text-primary text-xs ml-1"></i>' : ''}`;
+            document.getElementById('chatHeaderImg').src = chatData.img;
             document.getElementById('chatHeaderStatus').innerText = id === 'bot' ? (currentLang === 'pl' ? 'Zawsze aktywny' : 'Always active') : (currentLang === 'pl' ? 'Teraz online' : 'Online now');
             
-            window.renderCurrentChat();
-            
-            const chatScreen = document.getElementById('chatScreen');
+            renderCurrentChat();
             chatScreen.classList.remove('hidden'); 
             requestAnimationFrame(() => chatScreen.classList.remove('translate-x-full')); 
-            window.scrollToBottom();
-        };
+            scrollToBottom();
+            document.getElementById('chatOptionsMenu').classList.add('hidden');
+        }
 
-        window.closeChat = () => {
-            const chatScreen = document.getElementById('chatScreen');
+        function closeChat() { 
             chatScreen.classList.add('translate-x-full'); 
-            setTimeout(() => chatScreen.classList.add('hidden'), 300);
-        };
+            setTimeout(() => chatScreen.classList.add('hidden'), 300); 
+            renderAllChatsList(); // Aktualizuje podgląd ostatnich wiadomości po wyjściu
+        }
 
-        window.handleChatEnter = (e) => { 
-            if (e.key === 'Enter') window.sendMessage(); 
-        };
+        function handleChatEnter(e) { if (e.key === 'Enter') sendMessage(); }
+        function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
 
-        window.scrollToBottom = () => { 
-            const messagesContainer = document.getElementById('chatMessages');
-            if(messagesContainer) {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight; 
-            }
-        };
-
-        window.renderCurrentChat = () => {
-            const messagesContainer = document.getElementById('chatMessages');
-            messagesContainer.innerHTML = '<div class="text-center my-4"><span class="text-xs text-gray-400 font-medium bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-full" data-i18n="chatToday">Dziś</span></div>';
+        function renderCurrentChat() {
+            messagesContainer.innerHTML = '<div class="text-center my-4"><span class="text-xs text-gray-400 font-medium bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-full">Dziś</span></div>';
             const history = allChatHistories[currentChatId].messages;
             history.forEach(msg => { 
-                const isUser = msg.role === 'user'; 
-                window.appendMessageUI(msg.parts[0].text, isUser, isUser ? '' : allChatHistories[currentChatId].img); 
+                if(msg.role !== 'system') { // Nie wyświetlamy promptów systemowych
+                    const isUser = msg.role === 'user'; 
+                    appendMessageUI(msg.parts[0].text, isUser, isUser ? '' : allChatHistories[currentChatId].img); 
+                }
             });
-        };
+        }
 
-        window.appendMessageUI = (text, isUser = true, avatarUrl = '') => {
-            const messagesContainer = document.getElementById('chatMessages');
-            const wrapper = document.createElement('div'); 
-            wrapper.className = `flex ${isUser ? 'justify-end' : 'items-end space-x-2'} mb-4 fade-in`;
+        function appendMessageUI(text, isUser = true, avatarUrl = '') {
+            const wrapper = document.createElement('div'); wrapper.className = `flex ${isUser ? 'justify-end' : 'items-end space-x-2'} mb-4 fade-in`;
             let html = !isUser ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white">` : '';
             html += `<div class="${isUser ? 'bg-primary text-white rounded-2xl rounded-br-none' : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-bl-none shadow-sm'} px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap">${text}</div>`;
-            wrapper.innerHTML = html; 
-            messagesContainer.appendChild(wrapper); 
-            window.scrollToBottom();
-            
-            const previewEl = document.getElementById(`preview-msg-${currentChatId}`); 
-            if(previewEl) previewEl.innerText = isUser ? `Ty: ${text.substring(0,15)}...` : text.substring(0,15)+'...';
-        };
-
-        window.showTypingIndicator = () => {
-            const messagesContainer = document.getElementById('chatMessages');
-            const wrapper = document.createElement('div'); 
-            wrapper.id = 'typingIndicator'; 
-            wrapper.className = `flex items-end space-x-2 mb-4 fade-in`;
-            wrapper.innerHTML = `<img src="${allChatHistories[currentChatId].img}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white"><div class="bg-white border border-gray-100 dark:bg-gray-800 dark:border-gray-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex space-x-1"><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div></div>`;
-            messagesContainer.appendChild(wrapper); 
-            window.scrollToBottom();
-        };
+            wrapper.innerHTML = html; messagesContainer.appendChild(wrapper); scrollToBottom();
+        }
 
         window.removeTypingIndicator = () => {
             const ind = document.getElementById('typingIndicator');
             if (ind) ind.remove();
         };
+
+        function showTypingIndicator() {
+            const wrapper = document.createElement('div'); wrapper.id = 'typingIndicator'; wrapper.className = `flex items-end space-x-2 mb-4 fade-in`;
+            wrapper.innerHTML = `<img src="${allChatHistories[currentChatId].img}" class="w-8 h-8 rounded-full mb-1 object-cover bg-white"><div class="bg-white border border-gray-100 dark:bg-gray-800 dark:border-gray-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex space-x-1"><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div></div>`;
+            messagesContainer.appendChild(wrapper); scrollToBottom();
+        }
 
         window.fetchWithRetry = async (url, options) => {
             try { 
@@ -1987,28 +1994,23 @@ Poza tym krótko motywuj do treningu.`;
             } 
         };
 
-        window.triggerBotResponse = async () => {
-            window.showTypingIndicator();
-            
-            // Usunąłem sprawdzanie "AIzaSy", sprawdzam tylko czy klucz nie jest pusty lub testowy.
+        async function triggerBotResponse() {
+            showTypingIndicator();
             if (!apiKey || apiKey.includes("TUTAJ_WKLEJ")) {
                 setTimeout(() => { 
                     window.removeTypingIndicator(); 
                     let reply = "";
                     if(currentChatId === 'bot') {
-                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga klucza API, aby ułożyć prawdziwy plan)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
-                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi!`; }
-                    window.appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
+                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga poprawnego klucza API by działać)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
+                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Jasne, super pomysł!`; }
+                    appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
                     allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: reply }] }); 
                 }, 1000); return;
             }
             try {
-                // Gemini wymaga, by historia zaczynała się od wiadomości użytkownika (user).
-                // Filtrujemy pierwszą wiadomość powitalną bota (model), aby uniknąć błędu 400 Bad Request.
                 let messagesToSend = allChatHistories[currentChatId].messages.filter((m, index) => !(index === 0 && m.role === 'model'));
 
-                // Bezpośrednie i twarde połączenie z najnowszym API Gemini
-                const data = await window.fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { 
+                const data = await window.fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ 
@@ -2019,22 +2021,24 @@ Poza tym krótko motywuj do treningu.`;
                 
                 window.removeTypingIndicator();
                 const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd sieci.";
-                window.appendMessageUI(botReply, false, allChatHistories[currentChatId].img); 
+                appendMessageUI(botReply, false, allChatHistories[currentChatId].img); 
                 allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
             } catch (error) { 
                 window.removeTypingIndicator(); 
-                // Bezpośrednie przekazanie dokładnej informacji o błędzie do UI czatu
-                window.appendMessageUI("Błąd Google: " + error.message, false, allChatHistories[currentChatId].img); 
+                appendMessageUI("Błąd Google: " + error.message, false, allChatHistories[currentChatId].img); 
                 allChatHistories[currentChatId].messages.pop(); 
             }
-        };
+        }
 
-        window.sendMessage = async () => {
+        async function sendMessage() {
             const text = inputField.value.trim(); if (!text) return;
-            inputField.value = ''; inputField.focus(); window.appendMessageUI(text, true); 
+            inputField.value = ''; inputField.focus(); appendMessageUI(text, true); 
             allChatHistories[currentChatId].messages.push({ role: "user", parts: [{ text }] });
-            window.triggerBotResponse();
-        };
+            triggerBotResponse();
+        }
+        
+        // Render na starcie jeśli coś było
+        window.addEventListener('load', () => { renderAllChatsList(); });
     </script>
 </body>
 </html>
