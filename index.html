@@ -45,7 +45,7 @@
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       
         const firebaseConfig = {
-          apiKey: "AIzaSyAM6U506cQ3OqXQWqNFRTSRECRZdY0fNNE",
+          apiKey: "AQ.Ab8RN6LB_FXTaFt7teQR6yNr--7zU3MshtYS7k3G0uYf8pl92w",
           authDomain: "sport-matcher.firebaseapp.com",
           projectId: "sport-matcher",
           storageBucket: "sport-matcher.firebasestorage.app",
@@ -1711,7 +1711,7 @@
         // 11. CZAT, BOT I MIEJSCÓWKI
         const chatScreen = document.getElementById('chatScreen'); const messagesContainer = document.getElementById('chatMessages'); const inputField = document.getElementById('chatInput');
         const defaultBotAvatar = 'https://ui-avatars.com/api/?name=Trener+Bot&background=22c55e&color=fff';
-        const apiKey = "AQ.Ab8RN6LB_FXTaFt7teQR6yNr--7zU3MshtYS7k3G0uYf8pl92w"; // Twój najnowszy klucz z AI Studio
+        const apiKey = "TUTAJ_WKLEJ_SWOJ_KLUCZ_ZACZYNAJACY_SIE_OD_AIzaSy"; // MUSISZ WYGENEROWAĆ KLUCZ Z AISTUDIO.GOOGLE.COM
 
         // NOWY STAN CZATÓW
         let blockedUsers = new Set();
@@ -1930,23 +1930,24 @@ Poza tym krótko motywuj do treningu.`;
 
         window.triggerBotResponse = async () => {
             window.showTypingIndicator();
-            if (!apiKey) {
+            // USUNIĘTO BLOKADĘ KLUCZY ZACZYNAJĄCYCH SIĘ OD "AQ." !
+            if (!apiKey || apiKey.includes("TUTAJ_WKLEJ")) {
                 setTimeout(() => { 
                     document.getElementById('typingIndicator')?.remove(); 
                     let reply = "";
                     if(currentChatId === 'bot') {
-                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 Biegaj 10km codziennie! (Wymaga API by działać pełniej)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
-                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi!`; }
+                        reply = isPro ? "Trener Bot: Masz plan PRO! 💪 (Wklej poprawny klucz API, abym mógł wygenerować dla Ciebie prawdziwy plan treningowy!)" : "Niestety, perfekcyjne i skuteczne plany treningowe są dostępne tylko w planie PRO. Zaktualizuj swój plan w zakładce Profil!";
+                    } else { reply = `(Odpowiedź od: ${allChatHistories[currentChatId].name}) Super, pasuje mi! (Podepnij klucz API by ożywić bota)`; }
                     window.appendMessageUI(reply, false, allChatHistories[currentChatId].img); 
                     allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: reply }] }); 
                 }, 1000); return;
             }
             try {
-                const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: allChatHistories[currentChatId].messages, systemInstruction: { parts: [{ text: getSystemPrompt() }] } }) });
+                const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: allChatHistories[currentChatId].messages, systemInstruction: { parts: [{ text: getSystemPrompt() }] } }) });
                 document.getElementById('typingIndicator')?.remove();
                 const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd sieci.";
                 window.appendMessageUI(botReply, false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.push({ role: "model", parts: [{ text: botReply }] });
-            } catch (error) { document.getElementById('typingIndicator')?.remove(); window.appendMessageUI("Błąd serwera.", false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.pop(); }
+            } catch (error) { document.getElementById('typingIndicator')?.remove(); window.appendMessageUI("Błąd serwera. Sprawdź klucz API.", false, allChatHistories[currentChatId].img); allChatHistories[currentChatId].messages.pop(); }
         }
 
         window.sendMessage = async () => {
